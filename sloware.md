@@ -61,4 +61,23 @@ Although Alexandrescu does not mention it, further loop unrolling won't help: th
 
 ## Lesson about combinatorial functions
 
-(in progress)
+A combinatorial function (a funciton whose return value depends only on the inputs and not on the state of execution) should have sparingly few conditional branches, only to deal with the edge cases.  If one wants to make combinatorial functions faster, one should think harder about the logical operations to calculate the return value.  As explained before, conditional branches when mispredicted are very expensive, and with the ever increasing depths of execution pipelines, ever more so, there is always an increasing budget to replace conditional branching by logic.
+
+This is what I do in [my `digits10` function](https://github.com/thecppzoo/inprogress/blob/master/inc/digits10/digits10.h#L55):
+
+```c++
+constexpr unsigned digits10(unsigned long arg) {
+    if(arg < 10) { return 1; }
+    auto l2f = log2floor(arg);
+    using Combination = detail::P10<meta::Indices<sizeof(long unsigned)*8 - 1>>; 
+    auto cut = arg < Combination::nextPowerOf10(l2f) ? 0 : 1;
+    auto base = Combination::ndigits(l2f);
+    return cut + base;
+}
+```
+
+I calculate the floor of the logarithm base 2 of the argument, which in all platforms should be a very fast operation, to then lookup what is the number of digits that correspond to that power of 2, and a threshold, if there is one, at which the number crosses a power of 10, to add one digit more to the result.  For example, for the number 11000 the floor of its log2 is 13, that corresponds to 8192 or 4 digits, but it is higher than the cutoff for numbers higher than 2^13 but smaller than 2^14 which is 10000, thus, the code adds one, and returns the correct 5.
+
+## Metaprogramming to make lookup tables
+
+I don't bother doing by hand lookup tables, I try hard to not put "magical numbers" in my code.  Metaprogramming lookup tables is complicated, but I got the hang of it and now every time that it makes sense, the metaprogramming of lookup tables saves me effort and gives me performance and code robustness.  This is something I will be explaining in successive articles because I use it all the time, it saves a lot of effort, and I think my explanations will be of value.

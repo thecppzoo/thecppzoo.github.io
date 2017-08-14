@@ -76,7 +76,9 @@ constexpr unsigned digits10(unsigned long arg) {
 }
 ```
 
-I calculate the floor of the logarithm base 2 of the argument, which in all platforms should be a very fast operation, to then lookup what is the number of digits that correspond to that power of 2, and a threshold, if there is one, at which the number crosses a power of 10, to add one digit more to the result.  For example, for the number 11000 the floor of its log2 is 13, that corresponds to 8192 or 4 digits, but it is higher than the cutoff for numbers higher than 2^13 but smaller than 2^14 which is 10000, thus, the code adds one, and returns the correct 5.
+I calculate the floor of the logarithm base 2 of the argument, which in all platforms should be a very fast operation, to then lookup what is the number of digits that correspond to that power of 2, this is done in `ndigits(...)` and a threshold, `nextPowerOf10(...)`, if there is one, at which the number crosses a power of 10, to add one digit more to the result.  For example, for the number 11000 the floor of its log2 is 13, that corresponds to 8192 or 4 digits, but it is higher than the cutoff for numbers higher than 2^13 but smaller than 2^14 which is 10000, thus, the code adds one, and returns the correct 5.
+
+In principle, I could have gotten a humungously large lookup table, but of course, it would make the program excessively slow due to cache misses in the lookups.  I think this is close to an optimal lookup + logic combination.
 
 ## Metaprogramming to make lookup tables
 

@@ -83,3 +83,27 @@ In principle, I could have gotten a humungously large lookup table, but of cours
 ## Metaprogramming to make lookup tables
 
 I don't bother doing by hand lookup tables, I try hard to not put "magical numbers" in my code.  Metaprogramming lookup tables is complicated, but I got the hang of it and now every time that it makes sense, the metaprogramming of lookup tables saves me effort and gives me performance and code robustness.  This is something I will be explaining in successive articles because I use it all the time, it saves a lot of effort, and I think my explanations will be of value.
+
+[`nextPowerOf10`](https://github.com/thecppzoo/inprogress/blob/master/inc/digits10/digits10.h#L39) is an example of how to make a lookup table:
+
+```c++
+template<typename> struct P10;
+template<unsigned long... p2s>
+struct P10<meta::IndexPack<unsigned long, p2s...>> {
+    static constexpr long unsigned nextPowerOf10(unsigned p2) {
+        constexpr unsigned long arr[] = {
+            pureconstexpr::nextPowerOf10(1ul << p2s)...
+        };
+        return arr[p2];
+    }
+
+    static constexpr unsigned ndigits(unsigned p2) {
+        constexpr unsigned arr[] = {
+            (1 + pureconstexpr::log10floor(1ul << p2s))...
+        };
+        return arr[p2];
+    }
+};
+```
+
+Given a template that "tells the code" an argument to fill in the values of the lookup table, the `IndexPack<unsigned long, p2s...>` allows you to do `auto arr[] = { function(p2s)... };`.  Please observe the elipsis is outside the function call, meaning that the function `function` will be called for each member of the parameter pack.  The code *captures* this array as a `constexpr`, meaning that the values are available at compilation time and all!

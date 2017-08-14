@@ -106,7 +106,7 @@ struct P10<meta::IndexPack<unsigned long, p2s...>> {
 };
 ```
 
-Given a template that "tells the code" an argument to fill in the values of the lookup table, the `IndexPack<unsigned long, p2s...>` allows you to do `auto arr[] = { function(p2s)... };`.  Please observe the elipsis is outside the function call, meaning that the function `function` will be called for each member of the parameter pack.  The code *captures* this array as a `constexpr`, meaning that the values are available at compilation time and all!, an expression such as `static_assert(10 == digits10(~0), "");` is perfectly fine (by the way, `0` is an integer that in my x86-64 will be 32 bits, `~0` sets all the 32 bits to one, and is effectively, the largest 32 bit unsigned number, 4 G)
+Given a template that "tells the code" an argument to fill in the values of the lookup table, the `IndexPack<unsigned long, p2s...>` allows you to do `auto arr[] = { function(p2s)... };`.  Please observe the elipsis is outside the function call, meaning that the function `function` will be called for each member of the parameter pack.  The code *captures* this array as a `constexpr`, meaning that the values are available at compilation time and all!, an expression such as `static_assert(10 == digits10(~0), "");` is perfectly fine (by the way, `0` is an integer that in my x86-64 will be 32 bits, `~0` sets all the 32 bits to one, and is effectively, the largest 32 bit unsigned number, 4G - 1)
 
 ## Benchmarking
 

@@ -106,6 +106,40 @@ struct P10<meta::IndexPack<unsigned long, p2s...>> {
 };
 ```
 
+In the code above do not confuse `nextPowerOf10` with `pureconstexpr::nextPowerOf10`, this is the relevant excerpt:
+
+```c++
+/// pureconstexpr is meant for functions too slow to be called at runtime
+namespace pureconstexpr {
+
+    constexpr int log10floor(unsigned long arg) {
+        return arg < 10 ? 0 : 1 + log10floor(arg / 10);
+    }
+
+    constexpr long unsigned exp10(unsigned exp) {
+        return exp < 1 ? 1 : 10 * exp10(exp - 1);
+    }
+
+}
+
+constexpr unsigned log2floor(unsigned long arg) {
+    auto leadingZeroes = __builtin_clzll(arg);
+    auto rv = sizeof(arg)*8 - 1 - leadingZeroes;
+    return rv; 
+}
+
+namespace pureconstexpr {
+
+    constexpr unsigned long nextPowerOf10(unsigned long arg) {
+        auto l10 = log10floor(arg);
+        return exp10(l10 + 1);
+    }
+
+}
+```
+
+There are several elements of my coding style, I put in a namespace such as `pureconstexpr` things that are very slow algorithms but useful in "constexprs".  The implementations of `log10floor` and the rest are the straightforward method, and not correct functions either because they don't handle the edge cases correctly.  These are "quick and dirty" tools for metaprogramming.
+
 Given a template that "tells the code" an argument to fill in the values of the lookup table, the `IndexPack<unsigned long, p2s...>` allows you to do `auto arr[] = { function(p2s)... };`.  Please observe the elipsis is outside the function call, meaning that the function `function` will be called for each member of the parameter pack.  The code *captures* this array as a `constexpr`, meaning that the values are available at compilation time and all!, an expression such as `static_assert(10 == digits10(~0), "");` is perfectly fine (by the way, `0` is an integer that in my x86-64 will be 32 bits, `~0` sets all the 32 bits to one, and is effectively, the largest 32 bit unsigned number, 4G - 1)
 
 ## Benchmarking

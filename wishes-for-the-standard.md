@@ -6,6 +6,6 @@ Primitive data types are the fastest, best supported types in the language.  Man
 
 ## Why can't you inherit from unions?
 
-## Why can't you have the `reinterpret_cast`s allowed in the language for `constexpr`s
+## Why can't you have the `reinterpret_cast`s allowed in the language for `constexpr`s?
 
 ### By the way, how do you determine the endianness in a pure C++ 11, portable way?

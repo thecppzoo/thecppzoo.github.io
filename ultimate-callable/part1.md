@@ -2,7 +2,7 @@
 
 The consumption of events is a frequently important software engineering task.  I come from a background on automated trading, in which trading strategies and execution algorithms need to process financial exchange orders as soon as posible, there are literally fortunes to be made and lost on processing these things fast, and I got results on how to consume events the fastest.  This is what I will be describing in this series.
 
-The advice discussed in this series is a natural continuation to [the work I presented at CPPCon 2016](https://www.youtube.com/watch?v=z6fo90R8q5U), where I explain how to convert the specification of a financial exchange messages into events with maximal performance, now, let us talk about how to process events.
+The advice discussed in this series is a natural continuation to [the work I presented at CPPCon 2016](https://www.youtube.com/watch?v=z6fo90R8q5U), where I explain how to convert the specification of financial exchange messages into events with maximal performance, now, let us talk about how to process events.
 
 ## Preliminaries
 
@@ -79,22 +79,28 @@ If you have the freedom to design the interface for event consuming code, take i
 
 The user data may not be necessary, so, what is the cost of designing event interfaces with it?:
 
-    1. All subscriptions must have the reference to the user data
-    2. One extra parameter in the trampoline calls
+1. All subscriptions must have the reference to the user data
+2. One extra parameter in the trampoline calls
 
-For that cost the APIs acquire insurance against having to find out the execution context *at each event*, *for every subscriber*, and the user can't help in any way because the APIs don't provide a hook.
+For that cost the APIs acquire insurance against user-code having to find out the execution context *at each event*, *for every subscriber*, and the user can't help in any way because the APIs don't provide a hook.
 
-There is also the choice of the API wrapping the user data into its own structures, which I think is a design mistake.  For example in the popular LBM APIs \[[reference](https://kb.informatica.com/proddocs/Product%20Documentation/2/UMP_5.3.3_API_Reference_en.pdf)] the senders (message publishers), *and specially the receivers* are LBM types (structures) that have a field `clientd`, a `void *` with the user data.  The problems with this choice are multiple:
+I make the assumption of the user data being a callback argument because the other choices are strictly inferior:
 
-    1. It is one extra indirection.  Presumably the user data is important, having intermediate step of dereferencing the 'receiver' object for user-code to get to its data seems less performing than having it in the function call arguments.  If you think that there is no real expense here because the consumption of events may want to refer to the API implementation object that is receiving the event, as for example the LBM receiver, to query for anything API specific, then the following choice seems superior:
-    2. Rather than the API containing in its own data structures a link to the user data, it must be superior to have it the other way around, the user data, if the user wants it, have a link to the API data structure.  Because:
-        2.1. Allows the user choices on how to reference the API structures, including not referring to them
-        2.2. The use cases in which object consumption refers to the receiver APIs are in practice far less frequent and less critical than purely consuming the event data, therefore, when consuming events,
-            2.2.1 Access to the user data should be prioritized
-            2.2.2 Access to event API infrastructure objects may be de-prioritized
-        2.3. Frequently, accessing the API receivers occur as a result of unexpected situations.  This suggests that there should be protocol status changes, error, warning events, rather than the receivers having to interpret normal event data and inspecting API objects for anomalous conditions.
-        2.4 It prevents the entanglement or coupling between event API and user structures
-    3. The event consumption APIs, especially the callback signatures, must be application centric, or that they should provide directly the data most relevant to the event consumers, not the data relevant to the event implementations.
+1. If the reference to user data is wrapped into the event itself, then every callback call requires changing the event.  The event may be binary data that the API can't manipulate, for example, in the material I presented at CPPCon, the CME MPD3 messages are converted to events as-is, there is absolutely no conversion, simply a zero-performance cost of interpreting the binary data as events, but this means the event can't be changed.  Which is a good idea, anyway.
+2. There is also the choice of the event API wrapping the user data into API structures accessible through the event callback, which I think is a design mistake.
+
+The problems with the second choice are multiple:
+0. It requires changing API structures for each subscriber notification.
+1. It is one extra indirection.  Presumably the user data is important, having an intermediate step of dereferencing the event object for user-code to get to its data seems less performing than having it in the function call arguments.  If you think that there is no real expense here because the consumption of events may want to refer to the API implementation object that is receiving the event to query for anything API specific, then the following choice seems superior:
+2. Rather than the API containing in its own data structures a link to the user data, it must be superior to have it the other way around, the user data, if the user wants it, have a link to the API data structure.  Because:
+    0. The API structure associated to a subscriber in principle does not change across events
+    1. Allows the user choices on how to reference the API structures, including not referring to them
+    2. The use cases in which object consumption refers to the receiver APIs are in practice far less frequent and less critical than purely consuming the event data, therefore, when consuming events,
+        1. Access to the user data should be prioritized
+        2. Access to event API infrastructure objects may be de-prioritized
+    3. Frequently, accessing the API receivers occur as a result of unexpected situations.  This suggests that there should be protocol status changes, error, warning events, rather than the receivers having to interpret normal event data and inspecting API objects for anomalous conditions.
+    4 It prevents the entanglement or coupling between event API and user structures
+3. The event consumption APIs, especially the callback signatures, must be application centric, or that they should provide directly the data most relevant to the event consumers, not the data relevant to the event implementations.
 
 If the user data reference is provided explicitly as an argument in the callback, then there is the question of where to put in the argument list, as the first parameter or the last.  There is a performance difference.
 
@@ -173,9 +179,9 @@ byLast:
 
 What the assembler for those choices say is that if you put the user data first, the user data assumes the role of the `this` implicit parameter in the call for instance functions (methods), the only work needed is a tail call.  If the user data argument is the last parameter, in C++ we have no leeway, `this` will **always** be the first function call parameter, thus **the entire argument list must be rearranged at the point of calling the actual work**.  An optimizing compiler may prevent the reorganization of parameters in user code if the actual work is an inline function, in the example, if `processOrder` would be an inline function, but don't count on users being able to do this, the callbacks may belong to binary-only interfaces not owned by the user.
 
-By the way, for some reason unknown to me, most professionally designed APIs for event consumption make the mistake of putting the user data reference as the *last* argument of callbacks, LBM is one of them.
+By the way, for some reason unknown to me, most professionally designed APIs for event consumption make the mistake of putting the user data reference as the *last* argument of callbacks.  The popular LBM API \[[reference](https://kb.informatica.com/proddocs/Product%20Documentation/2/UMP_5.3.3_API_Reference_en.pdf)] makes this mistake, the callbacks have a field they call "clientd" which is a `void *` at the end of the callback argument list.
 
-Now that we have established the principle that *the reference to the user data must be the first argument in event callback design*, we will later see, when discussing the choices for implementations, that the implementation data needed in between trampoline compression and release should occur as the **last** argument.  This implementation mistake happens in rather highly performing libraries such as [nano-signal-slot](https://github.com/NoAvailableAlias/nano-signal-slot/blob/e13f25ac84913fd7a69e5523d581525f2a81de6a/nano_function.hpp#L73).
+Now that we have established the principle that *the reference to the user data must be the first argument in event callback design*, we will later see in detail an associated mistake, when discussing the choices for implementations: the implementation data needed in between trampoline compression and release should occur as the **last** argument.  This implementation mistake happens in rather highly performing libraries such as [nano-signal-slot](https://github.com/NoAvailableAlias/nano-signal-slot/blob/e13f25ac84913fd7a69e5523d581525f2a81de6a/nano_function.hpp#L73).
 
 ## `std::function` performance problems
 

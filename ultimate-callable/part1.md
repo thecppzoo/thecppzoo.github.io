@@ -120,6 +120,7 @@ Let us exaggerate, to illustrate the point, and say that the events are describe
 using byte = unsigned char;
 
 struct MarketDataReceiver {
+   // Note: making the processing an instance member function is an antipattern
     void processOrder(
         const char *buffer,
         byte channel,

@@ -196,17 +196,15 @@ By the way, for some reason unknown to me, most professionally designed APIs for
 
 Now that we have established the principle that *the reference to the user data must be the first argument in event callback design*, we will later see in detail an associated mistake, when discussing the choices for implementations: the implementation data needed in between trampoline compression and release should occur as the **last** argument.  This implementation mistake happens in rather highly performing libraries such as [nano-signal-slot](https://github.com/NoAvailableAlias/nano-signal-slot/blob/e13f25ac84913fd7a69e5523d581525f2a81de6a/nano_function.hpp#L73).
 
-
-
 #### Recommendation: do not implement callbacks as instance member functions
 
 One little digression:  `callbackFirst` and `processOrder` do exactly the same things, but they are different.  One is a non-instance function, the other an instance function.
 
 I would like you could set the callback to the address of `processOrder`, which would prevent the totally unnecessary extra indirection, and [GCC has an extension to let you do it](https://gcc.gnu.org/onlinedocs/gcc/Bound-member-functions.html), but alas, even though Clang supports it, *it is not portable*.  I am known to not make a fetish out of portability, but there is a deeper reason for why your API should not support this extension:  The expression for an instance member function, `&TheClass::theMethod` can refer to a non-virtual or a virtual just the same, indistinguishable from the signature, and the trait does not yet exist to query whether a pointer to a member function is virtual.  Theoretically you could implement the trait, [this answer at Stack Overflow gives you the key idea](https://stackoverflow.com/a/44048358), but still your API will reject user-supplied virtual member functions, or to support them you have to degrade performance doing the equivalent of pointer to instance member functions, which won't work, as [I explain in my wishes for the standard](https://github.com/thecppzoo/thecppzoo.github.io/blob/master/wishes-for-the-standard.md#obtaining-the-address-of-the-code-that-would-be-called-in-a-virtual-function-call).  I think this is a case in which *it is legitimate to force the user to wrap their use of polymorphism*, precisely because C++ does not let you bind a virtual function call, there aren't even GCC extensions for this, thus the only way for a user to preserve performance is for them to manually use any option of their choosing to accomplish this binding.  I have run into this annoyance continually all of the years I've been using C++.
 
-Leverage that a non-instance member function that takes as first argument its class can be safely converted to a signature that takes `void *` as first argument:  `Continuation (*)(YourClass *, Event)` can be safely converted to `Continuation (*)(void *, Event)`, although using `reinterpret_cast`.  But no worries, it is safe because `void *` is safely converted back and forth to a pointer of any data type of the same "const/volatileness", proven by the language allowing you to use `static_cast`.
+Leverage that a non-instance member function that takes as first argument a pointer or a reference to an instance of its class can be safely converted to a signature that takes `void *` as first argument:  `Continuation (*)(YourClass *, Event)` can be safely converted to `Continuation (*)(void *, Event)`, although using `reinterpret_cast`.  But no worries, it is safe because `void *` is safely converted back and forth to a pointer of any data type of the same "const/volatileness", proven by the language allowing you to use `static_cast`.
 
-In the example above, making `processOrder` an instance member function is the antipattern.  It should be an `static` or class member function:
+In the example above, making `processOrder` an instance member function is the antipattern.  It should be an `static` or class member function, or freestanding function, or a non-capturing lambda:
 
 ```c++
 static void processOrder(
@@ -219,7 +217,7 @@ static void processOrder(
 );
 ```
 
-This way you can use it directly as the callback, if you don't, even if everything is perfectly inlined, **you will still pay the price of wrapping the instance-function implementation, even if the wrapper is not necessary.
+This way you can use it directly as the callback, if you don't, even if everything is perfectly inlined, **you will still pay the price of wrapping the instance-function implementation, even if the wrapper is not necessary**, as proven by the example above in which `callbackFirst` is just a fully inlined wrapper around `processOrder`.
 
 ## `std::function` performance problems
 

@@ -177,4 +177,53 @@ wholeArraySingleDynamic(std::vector<Polymorphic*, std::allocator<Polymorphic*> >
 
 Although according to my understanding of the language in `alsoDoubleDynamic` to change the type of a polymorphic object referred to by `p` would invalidate `p`, neither GCC nor Clang take advantage of this to factor out the dynamic dispatch, they both generate dynamic dispatch for `p1()` and `p2()`, as indicated by `mov rax, qword ptr [rbx]`, which is to refresh the pointer to the vtable.
 
+In case you are wondering if you could factor out the virtual method addresses by using a pointer to member function, that gets even worse,
+```c++
+int stillDoubleDynamicAndWorse(
+    Polymorphic &p,
+    int (Polymorphic::*p1)(),
+    int (Polymorphic::*p2)()
+) {
+    return (p.*p1)() + (p.*p2)();
+}
+```
+gets converted to
+```assembly
+stillDoubleDynamicAndWorse(Polymorphic&, int (Polymorphic::*)(), int (Polymorphic::*)()): # @stillDoubleDynamicAndWorse(Polymorphic&, int (Polymorphic::*)(), int (Polymorphic::*)())
+  push rbp
+  push r15
+  push r14
+  push rbx
+  push rax
+  mov r15, r8
+  mov r14, rcx
+  mov rbx, rdi
+  add rdx, rbx
+  test sil, 1
+  je .LBB2_2
+  mov rax, qword ptr [rdx]
+  mov rsi, qword ptr [rax + rsi - 1]
+.LBB2_2:
+  mov rdi, rdx
+  call rsi
+  mov ebp, eax
+  add rbx, r15
+  test r14b, 1
+  je .LBB2_4
+  mov rax, qword ptr [rbx]
+  mov r14, qword ptr [rax + r14 - 1]
+.LBB2_4:
+  mov rdi, rbx
+  call r14
+  add eax, ebp
+  add rsp, 8
+  pop rbx
+  pop r14
+  pop r15
+  pop rbp
+  ret
+```
+because you now have all the inefficiencies you had before and the extra of the code having to discover the given pointer to member functions require dynamic dispatch.
+
 There is no portable way to leverage the fact that the programmer knows the objects will have the same type.  The programmer needs to provide access to the vtable as in the code for `implementations` above.
+

@@ -2,6 +2,8 @@
 
 The consumption of events is a frequently important software engineering task.  I come from a background on automated trading, in which trading strategies and execution algorithms need to process financial exchange orders as soon as posible, there are literally fortunes to be made and lost on processing these things fast, and I got results on how to consume events the fastest.  This is what I will be describing in this series.
 
+Every aspect of how to get performance known to me will be covered, that is what I mean by "ultimate".
+
 The advice discussed in this series is a natural continuation to [the work I presented at CPPCon 2016](https://www.youtube.com/watch?v=z6fo90R8q5U), where I explain how to convert the specification of financial exchange messages into events with maximal performance, now, let us talk about how to process events.
 
 ## Preliminaries
@@ -219,55 +221,76 @@ static void processOrder(
 
 This way you can use it directly as the callback, if you don't, even if everything is perfectly inlined, **you will still pay the price of wrapping the instance-function implementation, even if the wrapper is not necessary**, as proven by the example above in which `callbackFirst` is just a fully inlined wrapper around `processOrder`.
 
-## `std::function` performance problems
-
-The C++ standard library already provides the component for type-erased callables, from a while ago, as `std::function`, which even precedes other alternatives for non-callable type erasure such as `any`, `variant`.  `std::function` is a neat component: it lets you use anything that can be called with a particular function signature, the `std::function` can handle the lifetime of the held callable and everything.  The problem is that it is intolerably slow for the critical use case of calling the held callable.  Let us take a look:
+If you think using a capturing lambda might help, remember that a capturing lambda won't ever be the receiver (because you won't be able to make the `this` paramater explicit), thus, any way you set the callback you'll have to wrap the lambda, typically with yet another (non capturing) lambda.  The code below implements this idea, and introduces the small buffer optimization:
 
 ```c++
-#include <functional>
-
-using Event = char *;
-using Continuation = bool;
-
-using S = Continuation(Event);
-using F = std::function<S>;
+#include <utility>
+#include <new>
 
 struct Subscription {
     void *userData_;
-    Continuation (*callback_)(void *, Event);
+    int (*callback_)(void *, const char *);
 
-    Continuation operator()(Event e) {
-        return callback_(userData_, e);
+    template<typename Callable>
+    // assume the Callable "fits" in the place of a void pointer
+    void make(Callable &&c) {
+        using D = std::decay_t<Callable>;
+        new(&userData_) D{std::forward<Callable>(c)};
+        callback_ = [](void *p, const char *e) {
+            return (*static_cast<D *>(p))(e);
+        };
     }
 };
 
-template<typename Callable>
-Continuation call(Callable &c, Event e) {
-    return c(e);
+int call(Subscription &s, char *event) {
+    return s.callback_(s.userData_, event);
 }
 
-auto call_subscription = call<Subscription>;
-auto call_function = call<F>;
+struct MarketDataReceiver {
+    static int processOrder(
+        void *p,
+        const char *buffer
+    );
 
-struct Strategy {
-    void process(Event);
-
-    /// Notification is the callback
-    static Continuation notification(void *strategyPtr, Event e) {
-        static_cast<Strategy *>(strategyPtr)->process(e);
-        return false;
-    }
-
-    // ...
+    int pO(const char *e) { return processOrder(this, e); }
 };
 
-#include <new>
-
-void make_subscription(void *where, Strategy *s) {
-    new(where) Subscription{s, Strategy::notification};
+// Jumps directly to the implementation
+void set(Subscription &s, MarketDataReceiver &mdr) {
+    s.userData_ = &mdr;
+    s.callback_ = MarketDataReceiver::processOrder;
 }
 
-void make_function(void *where, Strategy *s) {
-    new(where) F{[=](Event e) { s->process(e); return false; }};
+void makeUsingNonInstanceFunction(Subscription &s, MarketDataReceiver &mdr) {
+    auto capture =
+        [amdr=&mdr] (const char *p) mutable { return MarketDataReceiver::processOrder(amdr, p); };
+    s.make(capture);
+}
+
+void makeUsingInstanceFunction(Subscription &s, MarketDataReceiver &mdr) {
+    auto capture =
+        [amdr=&mdr] (const char *p) mutable { return amdr->pO(p); };
+    s.make(capture);
 }
 ```
+
+Every way you try with lambdas, you get the pesky extra jump, not directly to `processOrder`.  [Code here]( https://godbolt.org/z/nTPRUT)
+
+### Do not force users to use inheritance
+
+A frequent mistake event APIs designers make is to force the receivers or subscribers to be part of a hierarchy.  In languages with poor expressivity, such as Java, this is a forced choice (it is the only way to achieve type erasure).  Two major objections come to mind:
+
+1. User types may use implementations from inheritance, thus having to inherit from a `Receiver` either leads to multiple inheritance of implementations or boilerplate code of reimplementations.
+2. There are many data types that don't allow inheritance, for example lambdas.
+
+### Part 1 conclusion
+
+Ultimate performance requires the event consumption to occur in a function.  Not an instance-member-function, especially not a virtual member function.  However, using instance member functions are not a big deal, they just introduce a jump indirection.
+
+### What's next?
+
+With regards to your subscriptions being able to handle the lifetimes of the user data given to them, I think this is unrelated to the callback function, thus, all of the requirements relate purely to type erasure.  That is why I began by implementing a maximal performance `any` component:  Substitute `void *` for your `any` in the code above.
+
+The C++ standard library already provides the component for type-erased callables, from a while ago, as `std::function`, which even precedes other alternatives for non-callable type erasure such as `any`, `variant`.  `std::function` is a neat component: it lets you use anything that can be called with a particular function signature, the `std::function` can handle the lifetime of the held callable and everything.  The problem is that it is intolerably slow for the critical use case of calling the held callable.  We will see how.  And then, `std::function` does not help you much in any other way.  Pity that the type erasure work needed to implement `std::function` was never available by itself, and eventually [`std::any` came underwhelming in C++ 17, including an important performance error](https://github.com/thecppzoo/zoo/blob/master/design/AnyContainer.md#performance-bug-in-the-specification).
+
+A great API for event consumption should facilitate user defined-events, the composition of events, an algebra of callables.

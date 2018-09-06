@@ -68,8 +68,9 @@ struct Strategy {
 ```
 
 An example of a subscription:
+
 ```c++
-publisher.subscribe(&strategy, &Strategy::notification);
+publisher.subscribe(&strategy, Strategy::notification);
 ```
 
 The code that receives an event may need to know for example what is the strategy, that is the role of the parameter `userData` in the subscription.  For generality we are using type erasure of the receiver as a `void *`, there are many choices for type erasure, which [I explain in detail on the design of my implementation of `any`](https://github.com/thecppzoo/zoo/blob/master/design/AnyContainer.md#alternatives-to-any) that are superior to using `void *`, however, what is desired here is not just to type erase the receiver, but also to take into account that the receiver has an entry point, a function call signature to receive the events.
@@ -101,14 +102,15 @@ I make the assumption of the user data being a callback argument because the oth
 2. There is also the choice of the event API wrapping the user data into API structures accessible through the event callback, which I think is a design mistake.
 
 The problems with the second choice are multiple, we will some of these in greater detail, but a short list:
-0. It requires changing API structures for each subscriber notification.
+
+1. It requires changing API structures for each subscriber notification.
 1. It is one extra indirection.  Presumably the user data is important, having an intermediate step of dereferencing the event object for user-code to get to its data seems less performing than having it in the function call arguments.  If you think that there is no real expense here because the consumption of events may want to refer to the API implementation object that is receiving the event to query for anything API specific, then the following choice seems superior:
-2. Rather than the API containing in its own data structures a link to the user data, it must be superior to have it the other way around, **the user data, if the user wants it, to have a link to the API data** structure.  Because:
-    0. The API structure associated to a subscriber in principle does not change across events
-    1. Allows the user choices on how to reference the API structures, including not referring to them
-    2. The use cases in which object consumption refers to the receiver APIs are in practice far less frequent and less critical than purely consuming the event data, therefore, when consuming events,
-        1. Access to the user data should be prioritized
-        2. Access to event API infrastructure objects may be de-prioritized
+    2. Rather than the API containing in its own data structures a link to the user data, it must be superior to have it the other way around, **the user data, if the user wants it, to have a link to the API data** structure.  Because:
+        0. The API structure associated to a subscriber in principle does not change across events
+        1. Allows the user choices on how to reference the API structures, including not referring to them
+        2. The use cases in which object consumption refers to the receiver APIs are in practice far less frequent and less critical than purely consuming the event data, therefore, when consuming events,
+            1. Access to the user data should be prioritized
+            2. Access to event API infrastructure objects may be de-prioritized
     3. Frequently, accessing the API receivers occur as a result of unexpected situations.  This suggests that there should be protocol status changes, error, warning events, rather than the receivers having to interpret normal event data and inspecting API objects for anomalous conditions.
         1. This point is motivation for work in this series:  A good event processing library makes it natural for users to define their own events.  Imagine an automated trading system in which several strategies are working with the same market data events, furthermore, let us say the strategies are cooperating.  If one strategy detects an error that is relevant to other strategies, the best choice seems to be that it generates an event, to be consumed by the other strategies or subscribers to events that represent errors.  This is a more fine-grained approach to handling errors that does not require the normally very expensive mechanism of exceptions.
     4. It prevents the entanglement or coupling between event API and user structures
@@ -221,7 +223,7 @@ static void processOrder(
 
 This way you can use it directly as the callback, if you don't, even if everything is perfectly inlined, **you will still pay the price of wrapping the instance-function implementation, even if the wrapper is not necessary**, as proven by the example above in which `callbackFirst` is just a fully inlined wrapper around `processOrder`.
 
-If you think using a capturing lambda might help, remember that a capturing lambda won't ever be the receiver (because you won't be able to make the `this` paramater explicit), thus, any way you set the callback you'll have to wrap the lambda, typically with yet another (non capturing) lambda.  The code below implements this idea, and introduces the small buffer optimization:
+If you think using a capturing lambda might help, remember that a capturing lambda won't ever be the receiver (because you won't be able to make the `this` paramater explicit in the parameter list), thus, any way you set the callback you'll have to wrap the lambda, typically with yet another (non capturing) lambda.  The code below implements this idea, and introduces the small buffer optimization:
 
 ```c++
 #include <utility>
@@ -274,7 +276,7 @@ void makeUsingInstanceFunction(Subscription &s, MarketDataReceiver &mdr) {
 }
 ```
 
-Every way you try with lambdas, you get the pesky extra jump, not directly to `processOrder`.  [Code here]( https://godbolt.org/z/nTPRUT)
+Every way you try with lambdas, you get the pesky extra jump, not directly to `processOrder`.  [Code here]( https://godbolt.org/z/nTPRUT).  Furthermore, the user data pointer will be the lambda-closure, never the receiver.
 
 ### Do not force users to use inheritance
 
@@ -293,4 +295,4 @@ With regards to your subscriptions being able to handle the lifetimes of the use
 
 The C++ standard library already provides the component for type-erased callables, from a while ago, as `std::function`, which even precedes other alternatives for non-callable type erasure such as `any`, `variant`.  `std::function` is a neat component: it lets you use anything that can be called with a particular function signature, the `std::function` can handle the lifetime of the held callable and everything.  The problem is that it is intolerably slow for the critical use case of calling the held callable.  We will see how.  And then, `std::function` does not help you much in any other way.  Pity that the type erasure work needed to implement `std::function` was never available by itself, and eventually [`std::any` came underwhelming in C++ 17, including an important performance error](https://github.com/thecppzoo/zoo/blob/master/design/AnyContainer.md#performance-bug-in-the-specification).
 
-A great API for event consumption should facilitate user defined-events, the composition of events, an algebra of callables.
+A great API for event consumption should facilitate user defined-events, the composition of events, an algebra of callables, we will hopefully get there.

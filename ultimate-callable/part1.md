@@ -1,4 +1,4 @@
-# Type-erasing callables for ultimate performance part 1.
+# Type-erasing callables for ultimate performance part 1
 
 The consumption of events is a frequently important software engineering task.  I come from a background on automated trading, in which trading strategies and execution algorithms need to process financial exchange orders as soon as posible, there are literally fortunes to be made and lost on processing these things fast, and I got results on how to consume events the fastest.  This is what I will be describing in this series.
 
@@ -105,7 +105,7 @@ The problems with the second choice are multiple, we will some of these in great
 
 1. It requires changing API structures for each subscriber notification.
 1. It is one extra indirection.  Presumably the user data is important, having an intermediate step of dereferencing the event object for user-code to get to its data seems less performing than having it in the function call arguments.  If you think that there is no real expense here because the consumption of events may want to refer to the API implementation object that is receiving the event to query for anything API specific, then the following choice seems superior:
-    2. Rather than the API containing in its own data structures a link to the user data, it must be superior to have it the other way around, **the user data, if the user wants it, to have a link to the API data** structure.  Because:
+    1. Rather than the API containing in its own data structures a link to the user data, it must be superior to have it the other way around, **the user data, if the user wants it, to have a link to the API data** structure.  Because:
         0. The API structure associated to a subscriber in principle does not change across events
         1. Allows the user choices on how to reference the API structures, including not referring to them
         2. The use cases in which object consumption refers to the receiver APIs are in practice far less frequent and less critical than purely consuming the event data, therefore, when consuming events,

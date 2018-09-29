@@ -163,4 +163,54 @@ Over the years I've developed a convention regarding boost preprocessing.  The m
 
 ## Complete configuration classes, the introduction of the power set covariant return type template pattern idiom
 
-We've lost one thing from the original of passing each flag as a parameter, that each had to be specified.
+We've lost one thing from the original of passing each flag as a parameter, that each had to be specified.  We should be able to recover that, to continue with the ongoing example, we need a way to reject at compilation time an attempt to create a `Font` with an incompletely specified `FontOptions`.  Conceivably we might use a compile-time value to indicate the flags set, but if we keep an eye toward generalizing this technique for types not boolean, in particular, not suitable to be constructed at compilation time, the mix between a compile time value with non-compile time parts seems not promising.  That leaves us with using a calculated type.
+
+We can extend the `FontOptions` with an integer template argument to serve as a set of flags, the ones set:
+
+```c++
+
+namespace zoo {
+    
+template<unsigned FlagsSet> class FOI {
+protected:
+    enum Flags { BOLD = 1, ITALIC = 2, UNDERLINED = 4, STRIKE_THROUGH = 8 };
+    unsigned char flagsSet = 0;
+
+    explicit constexpr FOI(unsigned integer) noexcept: flagsSet(integer) {}
+
+    constexpr unsigned flagVal(bool v, unsigned flag) const noexcept {
+        return v ? (flagsSet | flag) : (flagsSet & ~flag);
+    }
+
+    template<unsigned> friend class FOI;
+
+public:
+    FOI() = default;
+    FOI(const FOI &) = default;
+
+    constexpr FOI<FlagsSet | BOLD> bold(bool v) const noexcept {
+        return FOI<FlagsSet | BOLD>(flagVal(v, BOLD));
+    }
+
+    constexpr FOI<FlagsSet | ITALIC> italic(bool v) const noexcept {
+        return FOI<FlagsSet | ITALIC>(flagVal(v, ITALIC));
+    }
+
+    constexpr FOI<FlagsSet | UNDERLINED> underlined(bool v) const noexcept {
+        return FOI<FlagsSet | UNDERLINED>(flagVal(v, UNDERLINED));
+    }
+
+    constexpr FOI<FlagsSet | STRIKE_THROUGH> strike_through(bool v) const noexcept {
+        return FOI<FlagsSet | STRIKE_THROUGH>(flagVal(v, STRIKE_THROUGH));
+    }
+
+    constexpr bool getBold() const noexcept { return flagsSet & BOLD; }
+    constexpr bool getItalic() const noexcept { return flagsSet & ITALIC; }
+    constexpr bool getUnderlined() const noexcept { return flagsSet & UNDERLINED; }
+    constexpr bool getStrikeThrough() const noexcept { return flagsSet & STRIKE_THROUGH; }
+};
+
+}
+```
+
+

@@ -163,14 +163,13 @@ Over the years I've developed a convention regarding boost preprocessing.  The m
 
 ## Complete configuration classes, the introduction of the power set covariant return type template pattern idiom
 
-We've lost one thing from the original of passing each flag as a parameter, that each had to be specified.  We should be able to recover that, to continue with the ongoing example, we need a way to reject at compilation time an attempt to create a `Font` with an incompletely specified `FontOptions`.  Conceivably we might use a compile-time value to indicate the flags set, but if we keep an eye toward generalizing this technique for types not boolean, in particular, not suitable to be constructed at compilation time, the mix between a compile time value with non-compile time parts seems not promising.  That leaves us with using a calculated type.
+We've lost one thing from the original of passing each flag as a parameter, that each had to be specified.  We should be able to recover that, to continue with the ongoing example, we need a way to reject at compilation time an attempt to create a `Font` with an incompletely specified `FontOptions`.
+
+Conceivably we might use a compile-time value to indicate the flags set, but if we keep an eye toward generalizing this technique for types not boolean, in particular not suitable to be constructed at compilation time, the mix between a compile time value with non-compile time parts seems not promising.  That leaves us with using a calculated type.
 
 We can extend the `FontOptions` with an integer template argument to serve as a set of flags, the ones set:
 
 ```c++
-
-namespace zoo {
-    
 template<unsigned FlagsSet> class FOI {
 protected:
     enum Flags { BOLD = 1, ITALIC = 2, UNDERLINED = 4, STRIKE_THROUGH = 8 };
@@ -204,13 +203,54 @@ public:
         return FOI<FlagsSet | STRIKE_THROUGH>(flagVal(v, STRIKE_THROUGH));
     }
 
-    constexpr bool getBold() const noexcept { return flagsSet & BOLD; }
-    constexpr bool getItalic() const noexcept { return flagsSet & ITALIC; }
-    constexpr bool getUnderlined() const noexcept { return flagsSet & UNDERLINED; }
-    constexpr bool getStrikeThrough() const noexcept { return flagsSet & STRIKE_THROUGH; }
+    constexpr bool bold() const noexcept { return flagsSet & BOLD; }
+    constexpr bool italic() const noexcept { return flagsSet & ITALIC; }
+    constexpr bool underlined() const noexcept { return flagsSet & UNDERLINED; }
+    constexpr bool strikeThrough() const noexcept { return flagsSet & STRIKE_THROUGH; }
 };
+```
 
+Observe the "setters" do not set, they employ the "tried and true" functional programming technique of avoiding mutability by making a modified copy of the execution environment, but most importantly, **the modified copy has a different type!**, a new type that indicates the flag specified.
+
+Regardless of how the flags are specified, we can require them all by doing something like this:
+
+```c++
+struct Font {
+    // ...
+    Font(const std::string &, int, FOI<15>);
+```
+
+The overload requires a `FOI` with all four flags specified.
+
+An example of use,
+
+```c++
+Font makeBoldItalic12Font(const std::string &name) {
+    return  { name, 12, FOI<0>{}.bold(true).underlined(false).italic(true).strike_through(false) };
 }
 ```
 
+This technique, idiom, is more general than just guaranteeing complete configurations, thus, I will name it for what it is rather than this particular use.  The fundamental characteristic is that the "setters" change the return type, hence it contains "return type" in the name; the variation of the return type is a traversal of the power set of the set of flags required, but these traversals converge toward the complete set, furthermore, once you specify a flag, you won't un-specify it, and the technique can be used for several sets of properties to be specified, hence the *covariance*.  "Power set covariant return type" template pattern idiom.
+
+Quoting at length [the article that introduced this idiom](https://thecppzoo.blogspot.com/2016/01/achieving-ultimate-date.html),
+
+> Go ahead and try to build a Font from less than the result of initializing all the flags, the compiler will reject the code.
+
+> The technique before lets you:
+
+> To not lose any performance (if in doubt, construct a test case and see the assembler)
+> 1. Full battery of compile-time reasoning about the values
+> 2. To set the flags by name
+> 3. Regardless of order
+> 4. To have partial sets of flags and communicate them all over
+> 5. The ability to enforce that all the flags are needed, simply require the signature with the number that represents all bits set.
+> 6. Performance gains from keeping the set consolidated
+
+> In summary, **at the same time greater clarity and performance**.
+
+## Recap
+
+We have gained clarity and performance. Next, we can adapt the macro to take care of the new boilerplate, generalize the technique to configuration properties of arbitrary types; which will happen in a successive article.
+
+Also, we should comment on a sleight of hand we've made here: treating bit sets as an integer or vice versa as it is convenient to us. This goes against the principles of strict types present in the language; I think we should treat at length the subject of how strict types, which their advocates advocate because of potential optimizations related to propagation of constants and proving memory aliasing does not occur, in reality, from my point of view, impedes implementation-defined type punning extremely useful for clarity and performance. In my original articles I discovered the "power set..." idiom while talking about something else; that discussion will be continued.
 

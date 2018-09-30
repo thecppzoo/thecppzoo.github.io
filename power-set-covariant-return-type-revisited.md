@@ -2,9 +2,11 @@
 
 I wrote a set of five articles for my blog that cover aspects of the power set covariant return type idiom.  Because of a presentation by Ben Deane at CPPCon 2018 on ["Declarative Style..."](https://cppcon2018.sched.com/event/FnLS/easy-to-use-hard-to-misuse-declarative-style-in-c) (video nor slides yet available) which mentions it, I thought about consolidating the old writings into a self-sufficient article on the subject.
 
+Let us start at a motivating use case.
+
 ## Partial lists of function call arguments
 
-In my article ["Lists of function call arguments"](https://thecppzoo.blogspot.com/2015/12/lists-of-function-call-arguments.html) I refer to something which is not expressible in C++, lists of function call arguments.  This insuficiency is more glaring when they make function calls error prone.  One example is when conveying to the function a set of boolean configuration flags, a concrete example, let's say a typografic font may have the options of being underlined, bold, italic or strike-through.  This makes sense in C++:
+In my article ["Lists of function call arguments"](https://thecppzoo.blogspot.com/2015/12/lists-of-function-call-arguments.html) I refer to something which is not expressible in C++, lists of function call arguments.  This insuficiency is more glaring when they make function calls error prone.  One example is when conveying to the function a set of boolean configuration flags, a concrete example, let's say a typographic font may have the options of being underlined, bold, italic or strike-through.  This makes sense in C++:
 
 ```c++
 struct Font {
@@ -18,7 +20,7 @@ a constructor that takes a bunch of booleans.  The problem is that a call site
     auto font = Font{"Times New Roman", 14, false, true, false, true};
 ```
 
-is notorious for how hard it is to understand it:  What do those `false`s and `true`s mean?  This is error prone.
+is notoriously hard to understand:  What do those `false`s and `true`s mean?  This is error prone.
 
 If the symbol `#` could be used as syntax for an operator to indicate composition of partial argument lists, and `<#>` as a declarator of partial argument lists, the above line could be done this way, assuming `b` is a partial argument list in which "bold" is set, `stt` "strike-through",
 
@@ -27,12 +29,12 @@ If the symbol `#` could be used as syntax for an operator to indicate compositio
     auto font = Font{"Times New Roman", 14, # bold_and_strike_through};
 ```
 
-But such syntax does not exist at all.  C++ is deficient with respect to the argument lists, there is syntax only for the position.  Python, for example, at least allows named parameter lists (dictionary in Python's case), but of course, incurs a runtime cost for that.  More generally:
+But such syntax does not exist at all.  C++ is deficient with respect to the argument lists, there is syntax only for the position.  Python, for example, at least allows named parameter lists (dictionary), but of course, incurs a runtime cost for that.  More generally:
 
 1. Positional parameters are brittle: the function owner can remove and add a parameter and the call sites get invalidated without creating an error because the total number of parameters and the order of types the same
 2. Most of the times the order of parameters is arbitrary, there is no objective superior order; thus
-    1. There is no practical way to express default values
-    2. because it is arbitrary, programmers must remember the arbitrary order,
+    1. There is no practical way to express default values, for example, if the user wants to specify strike-through it needs to specify the preceding flags too.
+    2. because the order is arbitrary, programmers must remember it,
         1. which is a productivity waste,
         2. forces programmers to remember useless things,
         3. to count positions,
@@ -90,7 +92,7 @@ struct Font {
     Font(const std::string &, int, FontOptions);
 ```
 
-Allows the incontrovertible easy to understand, write, read, well performing
+Allows the incontrovertibly easy to understand, to write, to read, maximally performing
 
 ```c++
     auto font = Font{"Arial", 12, FontOptions{}.italic().bold()};
@@ -98,7 +100,7 @@ Allows the incontrovertible easy to understand, write, read, well performing
 
 By not requiring any order for the specification of the flags, we have also gained the ability to provide defaults.
 
-But without reflection/introspection nor Herb Sutter's metaclasses, writing `FontOptions` took a lot of work.  We can paliate their lack using macros.  I know, the usefulness of the rest of the discussion is suspect because I am advocating for a paliative for the lack of list of arguments using an idiom that itself requires a paliative... As a team leader I would rather my teams express as much as they can in code, even if such expression requires using a multiplicity of techniques.  **That is the fundamental element of my doctrine for software engineering: Express everything in code**.
+But without reflection/introspection nor Herb Sutter's metaclasses, writing `FontOptions` took a lot of work.  We can paliate their lack using macros.  I know, the usefulness of the rest of the discussion is suspect because I am advocating for a paliative for the lack of list of arguments using an idiom that itself requires a paliative... As a team leader I would rather my teams express as much as they can in code, even if such expression requires using a multiplicity of techniques.  **That is the fundamental element of my doctrine for software engineering: Express everything in code**.  Use whatever resource you must, including macros or leaping into other languages.
 
 I will quote at length my old article, which assumed knowledge of yet another deficiency in C++, that you can't handle programmatically identifiers, discussed in my article [Introspection, preprocessing, ...](https://thecppzoo.blogspot.com/2015/11/introspection-preprocessing-and-boost.html):
 
@@ -163,11 +165,11 @@ Over the years I've developed a convention regarding boost preprocessing.  The m
 
 ## Complete configuration classes, the introduction of the power set covariant return type template pattern idiom
 
-We've lost one thing from the original of passing each flag as a parameter, that each had to be specified.  We should be able to recover that, to continue with the ongoing example, we need a way to reject at compilation time an attempt to create a `Font` with an incompletely specified `FontOptions`.
+We've lost one thing from the original of passing each flag as a parameter, that each had to be specified.  We should be able to recover that.  To continue with the ongoing example, we need a way to reject at compilation time an attempt to create a `Font` with an incompletely specified `FontOptions`.
 
 Conceivably we might use a compile-time value to indicate the flags set, but if we keep an eye toward generalizing this technique for types not boolean, in particular not suitable to be constructed at compilation time, the mix between a compile time value with non-compile time parts seems not promising.  That leaves us with using a calculated type.
 
-We can extend the `FontOptions` with an integer template argument to serve as a set of flags, the ones set:
+We can extend the `FontOptions` with an integer template argument to serve as a set of flags, the ones set (FOI, f-ont o-ptions i-mplementation):
 
 ```c++
 template<unsigned FlagsSet> class FOI {
@@ -212,7 +214,7 @@ public:
 
 Observe the "setters" do not set, they employ the "tried and true" functional programming technique of avoiding mutability by making a modified copy of the execution environment, but most importantly, **the modified copy has a different type!**, a new type that indicates the flag specified.
 
-Regardless of how the flags are specified, we can require them all by doing something like this:
+Regardless of the order in which the user specifies the flags, we can require them all by doing something like this:
 
 ```c++
 struct Font {
@@ -234,7 +236,7 @@ This technique, idiom, is more general than just guaranteeing complete configura
 
 Quoting at length [the article that introduced this idiom](https://thecppzoo.blogspot.com/2016/01/achieving-ultimate-date.html),
 
-> Go ahead and try to build a Font from less than the result of initializing all the flags, the compiler will reject the code.
+> Go ahead and try to build a `Font` from less than the result of initializing all the flags, the compiler will reject the code.
 
 > The technique before lets you:
 
@@ -250,7 +252,14 @@ Quoting at length [the article that introduced this idiom](https://thecppzoo.blo
 
 ## Recap
 
-We have gained clarity and performance. Next, we can adapt the macro to take care of the new boilerplate, generalize the technique to configuration properties of arbitrary types; which will happen in a successive article.
+We have gained clarity and performance.
 
-Also, we should comment on a sleight of hand we've made here: treating bit sets as an integer or vice versa as it is convenient to us. This goes against the principles of strict types present in the language; I think we should treat at length the subject of how strict types, which their advocates advocate because of potential optimizations related to propagation of constants and proving memory aliasing does not occur, in reality, from my point of view, impedes implementation-defined type punning extremely useful for clarity and performance. In my original articles I discovered the "power set..." idiom while talking about something else; that discussion will be continued.
+We began with limitations of the language and this led to an idiom.
 
+Next, we can adapt the macro to take care of the new boilerplate, generalize the technique to configuration properties of arbitrary types; which will happen in successive articles because:
+1. The boilerplate will require considerations about how to deal with boost sequence lists of n-ary components that are sufficiently complicated over the macros shown before
+2. The configuration properties may include non-trivial types as `std::string` or perhaps aggregation of primitives that invite consolidation into a single value as we did with the sets of flags into a bitset, which forces considerations about strict aliasing.
+
+About that last point, we should comment on a sleight of hand we've made here: treating bit sets as an integer or vice versa as it is convenient to us. This goes against the principles of strict types present in the language; I think we should treat at length the subject of how strict types, which their advocates advocate because of potential optimizations related to propagation of constants and proving memory aliasing does not occur, in reality, from my point of view, impedes implementation-defined type punning extremely useful for clarity and performance while the other optimizations occur only very rarely, if ever.
+
+In my original articles I discovered the "power set..." idiom while talking about something else; that discussion will be continued.

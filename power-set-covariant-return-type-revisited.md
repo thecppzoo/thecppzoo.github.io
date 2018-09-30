@@ -1,12 +1,12 @@
 # The idiom of the "power set covariant return type" template pattern revisited
 
-I wrote a set of five articles for my blog that cover aspects of the power set covariant return type idiom.  Because of a presentation by Ben Deane at CPPCon 2018 on ["Declarative Style..."](https://cppcon2018.sched.com/event/FnLS/easy-to-use-hard-to-misuse-declarative-style-in-c) (video nor slides yet available) which mentions it, I thought about consolidating the old writings into a self-sufficient article on the subject.
+I wrote a set of five articles for my blog that cover aspects of the power set covariant return type idiom.  Because of a presentation by Ben Deane at CPPCon 2018 on ["Declarative Style..."](https://cppcon2018.sched.com/event/FnLS/easy-to-use-hard-to-misuse-declarative-style-in-c) (video nor slides yet available) which shows it (although not by name), I thought about consolidating the old writings into a self-sufficient article on the subject.
 
-Let us start at a motivating use case.
+Let us start with a motivating use case.
 
 ## Partial lists of function call arguments
 
-In my article ["Lists of function call arguments"](https://thecppzoo.blogspot.com/2015/12/lists-of-function-call-arguments.html) I refer to something which is not expressible in C++, lists of function call arguments.  This insuficiency is more glaring when they make function calls error prone.  One example is when conveying to the function a set of boolean configuration flags, a concrete example, let's say a typographic font may have the options of being underlined, bold, italic or strike-through.  This makes sense in C++:
+In my article ["Lists of function call arguments"](https://thecppzoo.blogspot.com/2015/12/lists-of-function-call-arguments.html) I refer to something which is not expressible in C++, lists of function call arguments.  This insufficiency is more glaring when they make function calls error prone.  One example is when conveying to the function a set of boolean configuration flags.  Let us use a very concrete example: a typographic font may have the options of being underlined, bold, italic or strike-through.  This makes sense in C++:
 
 ```c++
 struct Font {
@@ -29,14 +29,13 @@ If the symbol `#` could be used as syntax for an operator to indicate compositio
     auto font = Font{"Times New Roman", 14, # bold_and_strike_through};
 ```
 
-But such syntax does not exist at all.  C++ is deficient with respect to the argument lists, there is syntax only for the position.  Python, for example, at least allows named parameter lists (dictionary), but of course, incurs a runtime cost for that.  More generally:
+But such syntax does not exist at all.  C++ is deficient with respect to the argument lists, there is syntax only for the position.  Python, for example, at least allows named parameter lists (dictionary), but of course, incurs a runtime cost for that.  Perl treats arguments as an array, and there is the expressivity to treat such array as a named parameter list, JavaScript also treats arguments as an array and also has the expressivity to treat such array as a named parameter list.  More generally, just positional parameters:
 
-1. Positional parameters are brittle: the function owner can remove and add a parameter and the call sites get invalidated without creating an error because the total number of parameters and the order of types the same
-2. Most of the times the order of parameters is arbitrary, there is no objective superior order; thus
-    1. There is no practical way to express default values, for example, if the user wants to specify strike-through it needs to specify the preceding flags too.
-    2. because the order is arbitrary, programmers must remember it,
-        1. which is a productivity waste,
-        2. forces programmers to remember useless things,
+1. Are brittle: the function owner can remove and add a parameter and the call sites get invalidated without creating a compilation error because the total number of parameters and the order of types the same
+2. Most of the times the order of parameters is arbitrary, there is no objectively preferable order; thus
+    1. There is no practical way to express default values, for example, if the user wants to specify strike-through, the parameter at the last position, the user needs to specify the preceding flags too.
+    2. because the order is arbitrary, it forces programmers
+        1. to remember useless things, a productivity waste
         3. to count positions,
         4. to jump back and forth between declaration and call site
 4. It is a wasted opportunity for expressing the rather high cohesion between sets of parameters
@@ -44,7 +43,7 @@ But such syntax does not exist at all.  C++ is deficient with respect to the arg
 
 However, C++ has otherwise excellent expressiveness, there are choices to mitigate the problems.
 
-Dear Matthew Wilson, the author of "QM Bites" [Dec 2015](https://accu.org/index.php/journals/2183) explains that we should rather not use boolean arguments.  I don't disagree with the advice, given the practical considerations, my objection to the "Quality Matters Bite" is that the presentation of the problem is well done, but the consideration of the solutions don't include the fundamentals it should.
+Dear Matthew Wilson, the author of the Overload magazine's "QM Bites" [Dec 2015](https://accu.org/index.php/journals/2183) explains that we should rather not use boolean arguments.  I don't disagree with the advice, given the practical considerations, my objection to the "Quality Matters Bite" is that the presentation of the problem is well done, but the consideration of the solutions don't include the fundamentals it should.
 
 ## Configuration classes
 
@@ -92,7 +91,7 @@ struct Font {
     Font(const std::string &, int, FontOptions);
 ```
 
-Allows the incontrovertibly easy to understand, to write, to read, maximally performing
+This code allows the incontrovertibly easy to understand, to write, to read, maximally performing
 
 ```c++
     auto font = Font{"Arial", 12, FontOptions{}.italic().bold()};
@@ -100,18 +99,18 @@ Allows the incontrovertibly easy to understand, to write, to read, maximally per
 
 By not requiring any order for the specification of the flags, we have also gained the ability to provide defaults.
 
-But without reflection/introspection nor Herb Sutter's metaclasses, writing `FontOptions` took a lot of work.  We can paliate their lack using macros.  I know, the usefulness of the rest of the discussion is suspect because I am advocating for a paliative for the lack of list of arguments using an idiom that itself requires a paliative... As a team leader I would rather my teams express as much as they can in code, even if such expression requires using a multiplicity of techniques.  **That is the fundamental element of my doctrine for software engineering: Express everything in code**.  Use whatever resource you must, including macros or leaping into other languages.
+But without reflection/introspection nor Herb Sutter's metaclasses, writing `FontOptions` took a lot of work.  We can palliate the lack of introspection with preprocessor macros.  I know, the usefulness of the rest of the discussion is suspect because I am advocating for a palliative for the lack of list of arguments using an idiom that itself requires a palliative... As a team leader I would rather my teams express as much as they can in code, even if such expression requires a multiplicity of techniques.  **That is the fundamental element of my doctrine for software engineering: Express everything in code**.  Use whatever resource you must, including macros or leaping into other languages to encode your knowledge.
 
-I will quote at length my old article, which assumed knowledge of yet another deficiency in C++, that you can't handle programmatically identifiers, discussed in my article [Introspection, preprocessing, ...](https://thecppzoo.blogspot.com/2015/11/introspection-preprocessing-and-boost.html):
+I will quote at length my old article, which assumed familiarity with yet another deficiency of C++, that you can't handle programmatically identifiers, discussed in my article [Introspection, preprocessing, ...](https://thecppzoo.blogspot.com/2015/11/introspection-preprocessing-and-boost.html):
 
-As you can see, instead of suffering of problems mentioned, this example:
+As you can see, instead of suffering problems mentioned, this example:
 
 1. shows how easy it is to understand exactly what are the options set,
 2. there is no need to remember the order,
 3. introducing new options won’t even necessarily require recompilation, and in particular no code change,
 4. and should you want to change the meaning of any of the options, a simple grep of the desired setter will tell you reliably all the call sites so that you change accordingly.
 
-Very probably inside the `Font` implementation you’d want to have a set of options. You could use `FontOptions` exactly as it is inside Font. You could communicate internally the whole set of options using `FontOptions`. It is useful.
+Very probably inside the `Font` implementation you’d want to have a set of options. You could use `FontOptions` exactly as it is inside `Font`. You could communicate internally the whole set of options using `FontOptions`. It is useful.
 
 Observe that the implementation of `FontOptions` is very repetitive. And incomplete, since the constructors, setters, etc, are not `constexpr` `noexcept`, there is no operator for comparison, etc; it is error prone too, at any moment one could have written `italic` meaning `bold`. These things are best left to something automated. Unfortunately, we begin with a list of identifiers (`bold`, …) and as already explained in the [previous article](https://thecppzoo.blogspot.com/2015/11/introspection-preprocessing-and-boost.html), there is no support in pure C++ for them; we have turned the inexpressible function call argument list into a list of identifiers, thus, as done in the previous article, the next best choice is to use preprocessing:
 
@@ -148,7 +147,7 @@ The use of the macro `BOOLEAN_FLAG_SET` is very easy, for example:
 BOOLEAN_FLAG_SET(FO, (bold)(italic)(underlined)(strike_through));
 ```
 
-This would declare and define a class `FO` that does the same things as `FontOptions`. I hope you’d agree that declaration and definition takes very little effort and prevents lots of errors. Also, we could improve this so that we also get inserter and extractor operators with minimal effort.
+This would declare and define a class `FO` that does the same things as `FontOptions`. I hope you’d agree that declaration and definition takes very little effort and prevents lots of errors. Also, we could improve this so that we also get inserter and extractor operators to stream with minimal effort.
 
 Before explaining the implementation, as a conclusion to this article, I advocate for the following:
 
@@ -169,7 +168,7 @@ We've lost one thing from the original of passing each flag as a parameter, that
 
 Conceivably we might use a compile-time value to indicate the flags set, but if we keep an eye toward generalizing this technique for types not boolean, in particular not suitable to be constructed at compilation time, the mix between a compile time value with non-compile time parts seems not promising.  That leaves us with using a calculated type.
 
-We can extend the `FontOptions` with an integer template argument to serve as a set of flags, the ones set (FOI, f-ont o-ptions i-mplementation):
+We can extend the `FontOptions` class with an integer template argument to serve as a set of flags, the ones set (FOI, f-ont o-ptions i-mplementation):
 
 ```c++
 template<unsigned FlagsSet> class FOI {
@@ -212,7 +211,7 @@ public:
 };
 ```
 
-Observe the "setters" do not set, they employ the "tried and true" functional programming technique of avoiding mutability by making a modified copy of the execution environment, but most importantly, **the modified copy has a different type!**, a new type that indicates the flag specified.
+Observe the "setters" do not set, they employ the "tried and true" functional programming technique of avoiding mutability by making a modified copy of the execution environment, but most importantly, **the modified copy has a different type!**, a new one that indicates the flags specified.
 
 Regardless of the order in which the user specifies the flags, we can require them all by doing something like this:
 
@@ -256,10 +255,12 @@ We have gained clarity and performance.
 
 We began with limitations of the language and this led to an idiom.
 
-Next, we can adapt the macro to take care of the new boilerplate, generalize the technique to configuration properties of arbitrary types; which will happen in successive articles because:
-1. The boilerplate will require considerations about how to deal with boost sequence lists of n-ary components that are sufficiently complicated over the macros shown before
-2. The configuration properties may include non-trivial types as `std::string` or perhaps aggregation of primitives that invite consolidation into a single value as we did with the sets of flags into a bitset, which forces considerations about strict aliasing.
+## Follow up work
 
-About that last point, we should comment on a sleight of hand we've made here: treating bit sets as an integer or vice versa as it is convenient to us. This goes against the principles of strict types present in the language; I think we should treat at length the subject of how strict types, which their advocates advocate because of potential optimizations related to propagation of constants and proving memory aliasing does not occur, in reality, from my point of view, impedes implementation-defined type punning extremely useful for clarity and performance while the other optimizations occur only very rarely, if ever.
+Next, we can adapt the macro to take care of the new boilerplate, generalize the technique to configuration properties of arbitrary types; which will happen in successive articles because:
+1. The boilerplate-saving macros I implemented in the older articles are not explained and the explanation will require considerations about how to deal with boost sequence lists of n-ary components that are sufficiently more complicated to merit their own article
+2. The configuration properties may include non-trivial types such as `std::string` or perhaps aggregation of primitives that invite consolidation into a single value as we did with the sets of flags into a bitset-encoding number, which forces considerations about strict aliasing.
+
+About that last point, we should comment on a sleight of hand we've made here: treating bit sets as an integer or vice versa as it is convenient to us. This is valid, but goes against the principles of strict types in the standard; I think we should treat at length the subject of how strict types, which their advocates advocate because of potential optimizations related to propagation of constants and proving memory aliasing does not occur, in reality, from my point of view, impedes implementation-defined type punning extremely useful for clarity and performance while the other optimizations occur only very rarely, if ever.
 
 In my original articles I discovered the "power set..." idiom while talking about something else; that discussion will be continued.

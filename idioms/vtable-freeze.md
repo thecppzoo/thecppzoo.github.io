@@ -261,13 +261,31 @@ But **not even Clang supports it**
 
 ## Cost
 
-If the dynamic dispatch target is the same, the branch predictor will "learn" it, that is, there will be in the table for jump targets corresponding to the program counter (or instruction pointer) for the indirect call, the address of the target; unless this entry in the table is later clogged by some other code.  In general, if the branch predictor is allowed to do its job, the performance of the call itself will be identical to a static call from then on, however, the steps to find the target address will be executed, these steps are the true penalty that I am trying to avoid factoring out of the loop the "find the target address" part of dynamic dispatch, the AMD64 code for
+Because runtime polymorphism obviously depends on runtime data somehow, the function that will be called, the "target" can't be known at compilation time, thus, will be very expensive on the first call because the processor won't know where to go to next, and the execution pipeline will stall, typically dozens of clock cycles.
+
+Stallings will occur when the branch predictor mispredicts, for example, when you have containers with pointers to polymorphic objects of different types and you traverse the container in such a way that the type of the next object is not predicted well.
+
+1. You can minimize this cost by making your design in such a way that traversing the containers change the types the fewest times without otherwise incurring on extra costs.
+
+Not all the mispredictions of indirect jumps (calls) have the same cost: The earliest time the processor can get the actual target, when a misprediction is detected, the less it has to stall.
+
+2. Try to calculate the target ahead of the use, as for example converting the dynamic dispatch target into a function pointer, or factoring out of loops obtaining the target.
+
+The branch predictors work by maintaining the equivalent of a hash table from program counter addresses (instruction pointers) where indirect jumps occurs (or calls) to targets.  However, these tables are very expensive to manufacture and thus may be ineffective in many unpredictable cases.  For example, the hash table may have too many colisions (other parts of the program, unrelated, end up sharing just by coincidence the same entries in the table and interfering with each other).  This is an aspect in which micro-benchmarks will make indirect jumps (or calls) appear to be much more efficient than in real life, since micro benchmarks will be nearly ideal conditions for branch predictors to work well.
+
+One way in which you can increase the likelihood of branch predictor ineffectiveness is by having lots of indirect jumps in the assembler, thus
+
+3. Minimize the indirect calls by transforming conditionals before indirect calls into conditionals that calculate the jump address and have them converge to a single point of indirect calling.
+
+The reasons stated above are why it is important to eliminate the refresh of the vtable, the
 ```assembly
 move rax, qword ptr [<this_ptr>]
 ```
-to then `call qword ptr rax[8*<vtable method index>]`
+to then `call qword ptr rax[8*<vtable method index>]` right away, this *maximizes the chances of the branch predictor to fail*
 
 Also, if you carefully observe the assembler before, the compiler may generate a lot of inefficient assembler for pointer to instance member functions.
+
+4. Do not use pointer to member functions at runtime
 
 ## Freeze idiom
 

@@ -18,17 +18,23 @@ In many cases you write polymorphic code in which you know the type of the data 
 #include <tuple>
 
 struct Polymorphic {
+    // Two polymorphic functions
     virtual int p1();
     virtual int p2();
 
+    // Calls two polymorphic functions.
+    // Will the compilers translate this to use the VTable once or twice?
     int callBoth() {
         return p1() + p2();
     }
 
-    // implementations
+    // These functions represent instance member functions, they are
+    // class-functions that take *this as first argument for compatibility
+    // with function pointers.
     static int i1(Polymorphic &);
     static int i2(Polymorphic &);
 
+    // A polymorphic function that returns two implementation functions
     virtual std::tuple<
         int (*)(Polymorphic &),
         int (*)(Polymorphic &)
@@ -37,17 +43,27 @@ struct Polymorphic {
     }
 };
 
+// Because the function will be a public symbol,
+// the compiler will generate the assembler for the expression
 int doubleDynamic(Polymorphic &p) { return p.p1() + p.p2(); }
+// Shows there is no difference with the above
 int alsoDoubleDynamic(Polymorphic &p) { return p.callBoth(); }
 
 #include <vector>
 
+// Precondition that can not be expressed: the dynamic type of the
+// pointers will always be of exactly the same derived type of Polymorphic.
+// Thus, the invocations of p1 and p2 will be through dynamic dispatch
 int wholeArray(std::vector<Polymorphic *> &collection) {
     auto a = 0;
+    
     for(auto p: collection) { a += p->p1() + p->p2(); }
     return a;
 }
 
+// The precondition of the elements of the same type can now
+// be expressed by using the first element as a model for i1, i2
+// thus, this generates static dispatch
 int wholeArraySingleDynamic(std::vector<Polymorphic *> &collection) {
     auto a = 0;
     if(collection.empty()) { return a; }
@@ -225,5 +241,7 @@ stillDoubleDynamicAndWorse(Polymorphic&, int (Polymorphic::*)(), int (Polymorphi
 ```
 because you now have all the inefficiencies you had before and the extra of the code having to discover the given pointer to member functions require dynamic dispatch.
 
-There is no portable way to leverage the fact that the programmer knows the objects will have the same type.  The programmer needs to provide access to the vtable as in the code for `implementations` above.
+There is no portable way to leverage the fact that the programmer knows the objects will have the same type.  The programmer needs to provide access to the vtable as in the code for the polymorphic function `implementations` above.
+
+If the dynamic dispatch target is the same, the branch predictor will "learn" it and the performance of the call itself will be identical to a static call from then on, however, the steps to find the target address will be executed, these steps are the true penalty that I am trying to avoid factoring out of the loop the "find the target address" part of dynamic dispatch.
 

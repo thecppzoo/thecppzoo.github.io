@@ -269,3 +269,11 @@ to then `call qword ptr rax[8*<vtable method index>]`
 
 Also, if you carefully observe the assembler before, the compiler may generate a lot of inefficient assembler for pointer to instance member functions.
 
+## Freeze idiom
+
+The only solutions are those in which the targets can be converted to values efficiently handled by the language/compilers, that is, converted to function pointers.  The only three things portably converted to function pointers are: *class* member functions, freestanding functions, and non-capturing lambdas.
+
+Like in the code above, you can put the actual working code into *implementation functions* (again, class member functions, freestanding functions or non-capturing lambdas) as in `Polymorphic::i1`, `Polymorphic::i2`, wrapping them with virtual functions if desired, and providing direct access to the implementations with a virtual function such as in `Polymorphic::implementations`.
+
+Another choice is to altogether forget about virtual functions and implement the equivalent yourself, as Louis Dionne is doing with [Dyno](https://github.com/ldionne/dyno).
+

@@ -313,3 +313,11 @@ Sometimes the details are not available, and they are hard to measure (see what 
 
 There are architectures that have the feature of computing the indirect branch target, as [the article on branch prediction at the wikipedia explains](https://en.wikipedia.org/wiki/Branch_predictor#Indirect_branch_predictor).  That is where I got the links from.
 
+### Postscript
+
+I just got excellent articles on indirect branch predictions from the user @Dcoder at the x86 channel of the cpplang Slack workspace [link](https://cpplang.slack.com/archives/C3VR0DMQA/p1538959823000100):
+1. [http://www.cs.binghamton.edu/~dima/micro16.pdf](http://www.cs.binghamton.edu/~dima/micro16.pdf)
+2. [https://xania.org/201602/haswell-and-ivy-btb](https://xania.org/201602/haswell-and-ivy-btb)
+3. [http://www.ece.uah.edu/~milenka/docs/vuam_ispass09.pdf](http://www.ece.uah.edu/~milenka/docs/vuam_ispass09.pdf)
+4. [http://www.cs.binghamton.edu/~dima/taco16_branches.pdf](http://www.cs.binghamton.edu/~dima/taco16_branches.pdf)
+These links will take me a while to "digest"

@@ -271,7 +271,7 @@ Not all the mispredictions of indirect jumps (calls) have the same cost: The ear
 
 2. Try to calculate the target ahead of the use, as for example converting the dynamic dispatch target into a function pointer, or factoring out of loops obtaining the target.
 
-The branch predictors work by maintaining the equivalent of a hash table from program counter addresses (instruction pointers) where indirect jumps occurs (or calls) to targets.  However, these tables are very expensive to manufacture and thus may be ineffective in many unpredictable cases.  For example, the hash table may have too many colisions (other parts of the program, unrelated, end up sharing just by coincidence the same entries in the table and interfering with each other).  This is an aspect in which micro-benchmarks will make indirect jumps (or calls) appear to be much more efficient than in real life, since micro benchmarks will be nearly ideal conditions for branch predictors to work well.
+The branch predictors work by maintaining the equivalent of a hash table from program counter addresses (instruction pointers) where indirect jumps occurs (or calls) to targets.  However, these tables are very expensive to manufacture and thus may be ineffective in many unpredictable cases.  For example, the hash table may have too many colisions (other parts of the program, unrelated, end up sharing just by coincidence the same entries in the table and interfering with each other).  This is an aspect in which micro-benchmarks will make indirect jumps (or calls) appear to be much more efficient than in real life, since micro benchmarks will be nearly ideal conditions for branch predictors to work well.  See [Appendix A](#indirect_predictor) for details
 
 One way in which you can increase the likelihood of branch predictor ineffectiveness is by having lots of indirect jumps in the assembler, thus
 
@@ -294,4 +294,12 @@ The only solutions are those in which the targets can be converted to values eff
 Like in the code above, you can put the actual working code into *implementation functions* (again, class member functions, freestanding functions or non-capturing lambdas) as in `Polymorphic::i1`, `Polymorphic::i2`, wrapping them with virtual functions if desired, and providing direct access to the implementations with a virtual function such as in `Polymorphic::implementations`.
 
 Another choice is to altogether forget about virtual functions and implement the equivalent yourself, as Louis Dionne is doing with [Dyno](https://github.com/ldionne/dyno).
+
+# <a name="indirect_predictor">Appendix A:</a> Indirect Predictor:
+
+Jumping to (calling) a runtime-dependent address is called an "indirect jump".  Jon "Hannibal" Stokes explains in [his overview of the Pentium M](https://arstechnica.com/features/2004/02/pentium-m/3/) a little of how this works, which is relevant today because those techniques are the direct ancestors of today's.
+
+Sometimes the details are not available, and they are hard to measure (see what I said about microbenchmarking), thus I take articles such as [this](https://www.realworldtech.com/cpu-perf-analysis/5/) as general indicators.  A more fundamentals-based analysis is this old article, [Limits of Indirect Branch Prediction](http://hoelzle.org/publications/TRCS97-10.pdf) by Karel Driesen and Urs Hölzle at the University of California Santa Barbara.
+
+There are architectures that have the feature of computing the indirect branch target, as [the article on branch prediction at the wikipedia explains](https://en.wikipedia.org/wiki/Branch_predictor#Indirect_branch_predictor).  That is where I got the links from.
 

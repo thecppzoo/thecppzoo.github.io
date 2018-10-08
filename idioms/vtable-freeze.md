@@ -4,7 +4,7 @@ This article explains the costs of having dynamic dispatch in inner loops, and s
 
 ## What is the issue?
 
-In many cases you write polymorphic code in which you know the type of the data won't change while doing an operation.  It is very frequent you may have a container of pointers to objects of the same type, for example, all of the Java containers are exactly like this, collections of references to objects of exactly the same dynamic type that descends from `Object`, hence it is desirable to factor out the addresses of the virtual methods that will be called based on the first element in the container.  But standard C++ does not give you any way to do this, except mokeying with the vtable implementation of your ABI, or using GCC extensions.  For example,
+In many cases you write polymorphic code in which you know the type of the data won't change while doing an operation.  It is very frequent you may have a container of pointers to objects of the same type, for example, all of the Java containers are exactly like this, collections of references to objects of exactly the same dynamic type that descends from `Object`, hence it is desirable to factor out the addresses of the virtual methods that will be called based on the first element in the container.  But standard C++ does not give you any way to do this, except monkeying with the vtable implementation of your ABI, or using GCC extensions.  For example,
 
 ```c++
 #include <tuple>
@@ -177,7 +177,7 @@ wholeArraySingleDynamic(std::vector<Polymorphic*, std::allocator<Polymorphic*> >
         ; or, if it fails (because of the branch target buffer got messed with
         ; by unrelated code), the recovery from the misprediction should be
         ; quick since the value may be in a non-visible register or some
-        ; other processor mechanims
+        ; other processor mechanism
   mov ebx, eax
   mov rdi, r14
   call qword ptr [rsp]
@@ -304,7 +304,7 @@ The reasons stated above are why it is important to eliminate the refresh of the
 ```assembly
 move rax, qword ptr [<this_ptr>]
 ```
-to then `call qword ptr rax[8*<vtable method index>]` right away, this *maximizes the chances of the branch predictor to fail*
+to then `call qword ptr rax[8*<vtable method index>]` right away, this *maximizes the chances of the branch predictor to fail, and to fail in the most expensive way*, since the actual jump address is dependent on the immediately preceding instruction.
 
 Also, if you carefully observe the assembler before, the compiler may generate a lot of inefficient assembler for pointer to instance member functions.
 
@@ -316,9 +316,9 @@ I am just getting acquainted with the details of Spectre and Meltdown, the attac
 
 Indirect jumps are another attack vector:
 
-Let us say we have two classes: "SystemObject" and "UserObject".  Methods of "SystemObject" can access privileged memory, while "UserObject"'s can't.  If we "train" the branch predictor we will act on a "UserObject" with user data, afterward we can call the polymorphic method with *system* or privileged data on a SystemObject, but the branch predictor will predict it is a "UserObject" which will speculatively execute the polymorphic version on "UserObject" which may cause side effects that are not completely reverted when the misprediction is detected.
+Let us say we have two classes: "SystemObject" and "UserObject".  Methods of "SystemObject" can access privileged memory, while "UserObject"'s can't.  If we "train" the branch predictor we will act on a "UserObject" with user data, afterward we can call the polymorphic method with *system* or privileged data on a SystemObject, but the branch predictor will predict it is a "UserObject" which will speculatively execute the polymorphic version on "UserObject" using privileged memory which may cause side effects that are not completely reverted when the misprediction is detected, this is how the attack "leaks".
 
-Reasoning from first principles indicates that **shortening the time frame between misprediction and its detection mitigates** the attack while **not incurring on performance penalties**, yet another reason for precomputing the targets, factoring out of loops their calculation.
+Reasoning from first principles indicates that **shortening the time between misprediction and its detection mitigates** the attack while **not incurring on performance penalties**, yet another reason for precomputing the targets, factoring out of loops their calculation.
 
 ## Freeze idiom
 

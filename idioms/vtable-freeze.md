@@ -287,6 +287,16 @@ Also, if you carefully observe the assembler before, the compiler may generate a
 
 4. Do not use pointer to member functions at runtime
 
+### Spectre and Meltdown attacks
+
+I am just getting acquainted with the details of Spectre and Meltdown, the attacks related to changing the machine state through speculative execution.
+
+Indirect jumps are another attack vector:
+
+Let us say we have two classes: "SystemObject" and "UserObject".  Methods of "SystemObject" can access privileged memory, while "UserObject"'s can't.  If we "train" the branch predictor we will act on a "UserObject" with user data, afterward we can call the polymorphic method with *system* or privileged data on a SystemObject, but the branch predictor will predict it is a "UserObject" which will speculatively execute the polymorphic version on "UserObject" which may cause side effects that are not completely reverted when the misprediction is detected.
+
+Reasoning from first principles indicates that **shortening the time frame between misprediction and its detection mitigates** the attack while **not incurring on performance penalties**, yet another reason for precomputing the targets, factoring out of loops their calculation.
+
 ## Freeze idiom
 
 The only solutions are those in which the targets can be converted to values efficiently handled by the language/compilers, that is, converted to function pointers.  The only three things portably converted to function pointers are: *class* member functions, freestanding functions, and non-capturing lambdas.

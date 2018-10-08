@@ -295,7 +295,7 @@ Like in the code above, you can put the actual working code into *implementation
 
 Another choice is to altogether forget about virtual functions and implement the equivalent yourself, as Louis Dionne is doing with [Dyno](https://github.com/ldionne/dyno).
 
-# <a name="indirect_predictor">Appendix A:</a> Indirect Predictor:
+## <a name="indirect_predictor">Appendix A:</a> Indirect Predictor:
 
 Jumping to (calling) a runtime-dependent address is called an "indirect jump".  Jon "Hannibal" Stokes explains in [his overview of the Pentium M](https://arstechnica.com/features/2004/02/pentium-m/3/) a little of how this works, which is relevant today because those techniques are the direct ancestors of today's.
 

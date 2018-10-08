@@ -73,16 +73,22 @@ doubleDynamic(Polymorphic&): # @doubleDynamic(Polymorphic&)
   push rax
   mov rbx, rdi
   mov rax, qword ptr [rbx]
+        ; rax <- this, or rax <- vtable for p
   call qword ptr [rax]
+        ; indirect call to the virtual method at index 0 in the vtable of *p
   mov ebp, eax
   mov rax, qword ptr [rbx]
+        ; rax <- this
   mov rdi, rbx
+        ; rdi is the implicit first function call argument in the Itanium ABI, "this"
   call qword ptr [rax + 8]
+        ; the implicit call to p2, index 1 of the vtable for *p
   add eax, ebp
   add rsp, 8
   pop rbx
   pop rbp
   ret
+        ; notice in doubleDynamic the vtable is refreshed twice
 alsoDoubleDynamic(Polymorphic&): # @alsoDoubleDynamic(Polymorphic&)
   push rbp
   push rbx
@@ -92,13 +98,16 @@ alsoDoubleDynamic(Polymorphic&): # @alsoDoubleDynamic(Polymorphic&)
   call qword ptr [rax]
   mov ebp, eax
   mov rax, qword ptr [rbx]
+        ; refreshes rax with the vtable to call p2
   mov rdi, rbx
   call qword ptr [rax + 8]
+        ; p2 is index 1 of the vtable for *p
   add eax, ebp
   add rsp, 8
   pop rbx
   pop rbp
   ret
+        ; alsoDoubleDynamic is exactly the same, as expected
 wholeArray(std::vector<Polymorphic*, std::allocator<Polymorphic*> >&): # @wholeArray(std::vector<Polymorphic*, std::allocator<Polymorphic*> >&)
   push rbp
   push r15
@@ -119,6 +128,7 @@ wholeArray(std::vector<Polymorphic*, std::allocator<Polymorphic*> >&): # @wholeA
   mov rax, qword ptr [r14]
   mov rdi, r14
   call qword ptr [rax + 8]
+        ; Again, the same double reload of the vtable
   add ebx, ebp
   add ebx, eax
   add r15, 8
@@ -160,9 +170,22 @@ wholeArraySingleDynamic(std::vector<Polymorphic*, std::allocator<Polymorphic*> >
   mov r14, qword ptr [r15]
   mov rdi, r14
   call qword ptr [rsp + 8]
+        ; what we want!
+        ; notice the indirect call is to a value, *(rsp + 8) which
+        ; does NOT change within the loop
+        ; this maximizes the chances of the branch predictor to work well
+        ; or, if it fails (because of the branch target buffer got messed with
+        ; by unrelated code), the recovery from the misprediction should be
+        ; quick since the value may be in a non-visible register or some
+        ; other processor mechanims
   mov ebx, eax
   mov rdi, r14
   call qword ptr [rsp]
+        ; again, this should be the cheapest indirect call
+        ; by the way, that the compiler does not promote these to
+        ; non-ephemeral registers tells me this should be as fast
+        ; as call r<something>
+        ; which definitively is the fastest indirect call
   add ebx, ebp
   add ebx, eax
   add r15, 8

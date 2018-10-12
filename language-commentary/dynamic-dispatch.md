@@ -88,7 +88,7 @@ localBase(Base&):
 
 The loop starting at `.L9` and ending in `jne .L9` does not reload the vtable, it `call Base::function()` explicitly.  What is happening here is that by virtue of being a local variable, gcc is applying perhaps [Basic.life#9](http://eel.is/c++draft/basic.life#9):
 
-> If a program ends the lifetime of an object of type T with static, thread, or automatic storage duration and if T has a non-trivial destructor,42 the program must ensure that an object of the original type occupies that same storage location when the implicit destructor call takes place; otherwise the behavior of the program is undefined
+> If a program ends the lifetime of an object of type T with static, thread, or automatic storage duration and if T has a non-trivial destructor, the program must ensure that an object of the original type occupies that same storage location when the implicit destructor call takes place; otherwise the behavior of the program is undefined
 
 Notice there is a pre-condition, the presence of a non-trivial destructor.  I think GCC is in the wrong when `Base` has a trivial destructor, simply remove the destructor from `Base`:
 

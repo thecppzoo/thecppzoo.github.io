@@ -67,14 +67,14 @@ void scalePrices(
     Scale scale,
     Accessor accessor
 ) {
-    auto q = 1024;
+    constexpr auto q = 1024;
     auto aa = [](auto ptr) {
         auto rv = __builtin_assume_aligned(ptr, 64);
         return reinterpret_cast<Data *>(rv);
     };
     auto destination = aa(results);
     auto source = aa(inputs);
-    for(int i = q; q--; ) {
+    for(int i = q; i--; ) {
         *accessor(*destination++) = *accessor(*source++) * scale;
     }
 }
@@ -98,7 +98,7 @@ void prices(
 }
 ```
 
-The resulting assembler, as the [compiler explorer shows](https://gcc.godbolt.org/z/JuH4lD), even disabling loop unrolling, is this:
+The resulting assembler, as the [compiler explorer shows](https://gcc.godbolt.org/z/4XMniU), even disabling loop unrolling, is this:
 
 ```assembly
 scalePrices(double*, double const*, double): # @scalePrices(double*, double const*, double)

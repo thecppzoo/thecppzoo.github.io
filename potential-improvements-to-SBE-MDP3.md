@@ -209,7 +209,7 @@ If the processing is heterogeneous, or that it requires several members per data
 * in the case of an heterogeneous encoding, the accesses will require an array base, an index, the offsets to the members and possibly scaling addressing modes, but in the case of x86-64, at least, the "Scale Index Byte" mode won't work, because the straddle between elements is larger than 8, the maximum.
 * in the case of homogeneous encoding, the accesses will require several array bases, an index, and almost assured scaling addressing modes, since the straddle between the elements will be up to 8 bytes in most cases...
 
-The compiler can put the array bases in registers.  Thus, **even when the processing is heterogeneous, the homogeneous is advantageous!**
+The compiler can put the array bases in registers.  Thus, **even when the processing is heterogeneous, the homogeneous encoding is advantageous!**
 
 My SBE as part of MDP3 implementation knows all the data sizes at compilation time, but in this regard it is in the minority, the Real Logic implementation converts the XML specification into runtime data, that is, random access indexing operations require actual multiplications!, of course, normally one would iterate over the whole array which gives the opportunity to increment the index by adding the data size; however, if the encoding would be "arrays of aggregates are encoded as aggregate of arrays of primitives", then the scaling addressing modes would be used.
 

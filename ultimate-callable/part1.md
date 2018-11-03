@@ -206,7 +206,7 @@ One little digression:  `callbackFirst` and `processOrder` do exactly the same t
 
 I would like you could set the callback to the address of `processOrder`, which would prevent the totally unnecessary extra indirection, and [GCC has an extension to let you do it](https://gcc.gnu.org/onlinedocs/gcc/Bound-member-functions.html), but alas, not even Clang supports it, *it is not portable*.  I am known to not make a fetish out of portability, but there is a deeper reason for why your API should not support this extension:  The expression for an instance member function, `&TheClass::theMethod` can refer to a non-virtual or a virtual just the same, indistinguishable from the signature, and the trait does not yet exist to query whether a pointer to a member function is virtual.  Theoretically you could implement the trait, [this answer at Stack Overflow gives you the key idea](https://stackoverflow.com/a/44048358), but still your API will reject user-supplied virtual member functions, or to support them you have to degrade performance doing the equivalent of pointer to instance member functions, which won't work, as [I explain in my wishes for the standard](https://github.com/thecppzoo/thecppzoo.github.io/blob/master/wishes-for-the-standard.md#obtaining-the-address-of-the-code-that-would-be-called-in-a-virtual-function-call).  I think this is a case in which *it is legitimate to force the user to wrap their use of polymorphism*, precisely because C++ does not let you bind a virtual function call, there aren't even GCC extensions for this, thus the only way for a user to preserve performance is for them to manually use any option of their choosing to accomplish this binding.  I have run into this annoyance continually all of the years I've been using C++.
 
-Leverage that a non-instance member function that takes as first argument a pointer or a reference to an instance of its class can be safely converted to a signature that takes `void *` as first argument:  `Continuation (*)(YourClass *, Event)` can be safely converted to `Continuation (*)(void *, Event)`, although using `reinterpret_cast`.  But no worries, it is safe because `void *` is safely converted back and forth to a pointer of any data type of the same "const/volatileness", proven by the language allowing you to use `static_cast`.
+Leverage that a non-instance member function that takes as first argument a pointer or a reference to an instance of its class can be safely converted to a signature that takes `void *` as first argument:  `Continuation (*)(YourClass *, Event)` can be safely converted to `Continuation (*)(void *, Event)`<sup>[see note 1](#note1)</sup>, although using `reinterpret_cast`.  But no worries, it is safe because `void *` is safely converted back and forth to a pointer of any data type of the same "const/volatileness", proven by the language allowing you to use `static_cast`.
 
 In the example above, making `processOrder` an instance member function is the antipattern.  It should be an `static` or class member function, or freestanding function, or a non-capturing lambda:
 
@@ -221,9 +221,16 @@ static void processOrder(
 );
 ```
 
-This way you can use it directly as the callback, if you don't, even if everything is perfectly inlined, **you will still pay the price of wrapping the instance-function implementation, even if the wrapper is not necessary**, as proven by the example above in which `callbackFirst` is just a fully inlined wrapper around `processOrder`.
+This way you can use it directly as the callback, if you don't, even if everything is perfectly inlined, **you will still pay the price of wrapping the instance-function implementation, even if the wrapper is not otherwise necessary**, as proven by the example above in which `callbackFirst` is just a fully inlined wrapper around `processOrder` (just a jump).
 
-If you think using a capturing lambda might help, remember that a capturing lambda won't ever be the receiver (because you won't be able to make the `this` paramater explicit in the parameter list), thus, any way you set the callback you'll have to wrap the lambda, typically with yet another (non capturing) lambda.  The code below implements this idea, and introduces the small buffer optimization:
+The reason why you will pay the the unnecessary indirection is because the wrapper, because it is not the same as the original instance function or non-instance function **is not allowed to have the same value**.  That is, the **comparison `wrapperConvertedToFunctionPointer == originalFunction` must return false**.
+
+Finally, the wrapper may be inlined to avoid the unnecessary indirection; but please think about these consequences:
+
+1. Should there be types that imply side-effects while copying or moving, the rules of the language require these side effects to be preserved
+2. Even if not, you will be reducing the instruction cache effectiveness by inlining the same code over and over
+
+These are avoidable problems, **process events in non-instance functions you use for subscription**
 
 ```c++
 #include <utility>
@@ -296,3 +303,19 @@ With regards to your subscriptions being able to handle the lifetimes of the use
 The C++ standard library already provides the component for type-erased callables, from a while ago, as `std::function`, which even precedes other alternatives for non-callable type erasure such as `any`, `variant`.  `std::function` is a neat component: it lets you use anything that can be called with a particular function signature, the `std::function` can handle the lifetime of the held callable and everything.  The problem is that it is intolerably slow for the critical use case of calling the held callable.  We will see how.  And then, `std::function` does not help you much in any other way.  Pity that the type erasure work needed to implement `std::function` was never available by itself, and eventually [`std::any` came underwhelming in C++ 17, including an important performance error](https://github.com/thecppzoo/zoo/blob/master/design/AnyContainer.md#performance-bug-in-the-specification).
 
 A great API for event consumption should facilitate user defined-events, the composition of events, an algebra of callables, we will hopefully get there.
+
+## <a name="note1">Note 1:</a> Conversion of function pointers that take `void *`
+
+Let us say you have a function pointer whose call signature is this
+
+```c++
+SomeReturnValue (*functionPointer)(SomeType st1, void *voidPointer, SomeType2 st2)
+```
+
+If the program can guarantee the middle argument `voidPointer` will point to some type `Converted` upon invocation, You can safely convert that function pointer to a pointer of this signature:
+
+```c++
+SomeReturnValue (*functionPointer)(SomeType st1, Converted *cp, SomeType2 st2)
+```
+
+The reason is that the language allows a `void *` to point to any value residing in memory, and the conversion back to the original type is also valid.  The syntax, however, requires `reinterpret_cast` as opposed to the syntax for conversions of `void *` that allow `static_cast`.

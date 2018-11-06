@@ -112,7 +112,10 @@ shows all the work done to dispatch to an array of callables, more than half of 
 `AnyCallable` relies on a template argument to perform type erasure.  That could be any template mechanism, which makes it extremely powerful.  Already, the canonical type erasure component in the zoo library allows specifying the "small buffer" size and alignment, thus, you can benefit by doing this:
 
 ```c++
-using LargeAnyCallable = zoo::AnyCallable<zoo::AnyContainer<32, 8>>;
+static constexpr auto BigSize = 32;
+using LargePolicy = zoo::RuntimePolymorphicAnyPolicy<BigSize, 8>;
+using LargeTypeEraser = zoo::AnyContainer<LargePolicy>;
+using LargeAnyCallable = zoo::AnyCallable<LargeTypeEraser>;
 ```
 
 That gives you the opportunity to keep within the small buffer callables up to 32 bytes in size...

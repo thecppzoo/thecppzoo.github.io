@@ -182,6 +182,6 @@ With regards to expressing properties, invariants, etc., we have the class invar
 
 A few minutes ago I was informed of the existence of [this paper](http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p1296r0.pdf), `restrict` as an attribute.  It is a better-than-nothing patch; the problem is that C++ already has too many patches of this level of value, and we take too long to get rid of bad ideas.  At least I liked it mentions the problem of generalization, although within the context of they don't intend to support initially the expression of disjoint ranges as the semiopen pair of addresses, but as base and element count, which I dislike because it is an antipattern in C++.  For the same syntax expense they could have expressed that two ranges described by any pair of iterators would be disjoint.  Instead they make the same idea unnecessarily less useful by constraining it to arrays specifically...
 
-<sup><a id="#copy-and-pasting-is-evil">1:</a></sup> I need to compile all of my writings on redundant code is very detrimental
+<sup><a name="#bbb">1:</a></sup> I need to compile all of my writings on redundant code is very detrimental
 
 

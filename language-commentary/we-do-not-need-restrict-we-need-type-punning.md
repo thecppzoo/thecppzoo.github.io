@@ -172,16 +172,40 @@ We have already a nightmare with `const`, `volatile`, `constexpr` and even `noex
 
 So, I will be blunt, we can't put `restrict` in C++ as it is in C.
 
-However, it is not just that very important reason.  In C++ we also have references that refer to memory and thus may or may not overlap.  And while we are at that, we ought to remember we also have smart pointers, ranges, array indices, hash map keys that refer to objects that may or may not overlap.  The `restrict` annotation is applied to an object (the pointer) that refers to another object, and is useful not just to the compiler, but it may be useful to the programmer too.  For example, knowing that two sets of map keys have empty intersection mean updating the mapped objects from one set of keys can be done in parallel to the update of the other mapped keys, the order won't matter.
+However, it is not just that very important reason.  In C the `restrict` annotation is applied to an object (the pointer) that refers to another object.  There are only three ways to dereference memory in C, `*pointer`, `pointer[index]`, which is exactly equivalent to `*(pointer + index)`, and `pointer->field`; whereas in C++ we also have references that refer to memory and thus may or may not overlap.  And while we are at that, we ought to remember we also have smart pointers, iterators, ranges, array indices, hash map keys with very succinct syntax.  For all of those cases we may want to indicate the values will not overlap or coincide in memory.  `restrict` as in C is to devolve to use naked pointers, negates the wonderful economy of syntax from overloading key operators.  A feature that negates the best things of the language (namely, that user defined types are on equal footing with the language primitives) can't be a C++ solution.
 
-What is needed, then, is the way to express two sets have empty intersection.  Something like this would be a fundamental change to C++.
+Furthermore, whether things overlap or not shold be usable to the programmer, for the same reasons even though `const`, is a user-provided annotation, user code can benefit from it, there is such a concept of "`const`-correctness".  I am not sure the way to use the non-overlap annotation should be through overloads, just that there must be a way for the user code to distinguish at compilation time from using things allowed to overlap and those that have been guaranteed to not overlap.  Another example is that we use `std::forward` to preserve the value cathegory of arguments, etc.
+
+What is needed, then, is the way to express two sets have empty intersection.  Something like this would be a fundamental change to C++ but perhaps easy to implement.  I will come back momentarily to this point.
 
 Remember: the objective is to allow the programmer to discover or prove their objects satisfy guarantees and allow them to express those properties to activate better code paths, typically higher performing.  And we want to avoid copy and pasting<sup>[1: copy and pasting is evil](#copy-and-pasting-is-evil)</sup>.
 
-With regards to expressing properties, invariants, etc., we have the class invariant mechanism, and we will soon have *Concepts*, and the mechanisms are excellent, and lead to great code reuse.  Now, all we need is a way to express in source code, at compilation time, that objects acquired properties (because the program was able to guarantee them at runtime) or lost properties (because things change at runtime), if we can encode, express, arbitrarily complex properties of objects through the type system, the usefulness of changing types for the same objects, i.e. type punning, is only natural, I would say *essential*
+With regards to expressing properties, invariants, etc., we have the class invariant mechanism, and we will soon have *Contracts* and *Concepts*, the mechanisms are excellent, and lead to great code reuse.  Now, all we need is a way to express in source code, at compilation time, that objects acquired properties (because the program was able to guarantee them at runtime) or lost properties (because things change at runtime), if we can encode, express, arbitrarily complex properties of objects through the type system, the usefulness of changing types for the same objects, i.e. type punning, is only natural, I would say *essential*
 
-A few minutes ago I was informed of the existence of [this paper](http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p1296r0.pdf), `restrict` as an attribute.  It is a better-than-nothing patch; the problem is that C++ already has too many patches of this level of value, and we take too long to get rid of bad ideas.  At least I liked it mentions the problem of generalization, although within the context of they don't intend to support initially the expression of disjoint ranges as the semiopen pair of addresses, but as base and element count, which I dislike because it is an antipattern in C++.  For the same syntax expense they could have expressed that two ranges described by any pair of iterators would be disjoint.  Instead they make the same idea unnecessarily less useful by constraining it to arrays specifically...
+A few hours ago I was informed of the existence of [this paper](http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p1296r0.pdf), `restrict` as part of a contract.  It is a better-than-nothing patch; the problem is that C++ already has too many patches of this level of value, and we take too long to get rid of bad ideas.  At least I liked it mentions the problem of generalization, although within the context of they don't intend to support initially the expression of disjoint ranges as the semiopen pair of addresses (`begin` and `end`), but as array base and element count, which I dislike because it is an antipattern in C++.  I find it offensive from this proposal not only we have to devolve to naked pointers to express objects don't overlap, but also start calculating element counts.
+
+For the same syntax expense they could have expressed that two ranges described by any pair of iterators would be disjoint.  Instead they make the same idea unnecessarily less useful by constraining it to arrays specifically...
+
+## A proposal to express non-overlap
+
+The proposal mentioned above does not take into account the insight that what is being restricted are not the pointers but what they dereference, derived expressions.  The proper generalization to C++ is to the set of all memory objects referenced through derived expressions of the named values that are "disjoint".  I mean something like the following:
+
+```c++
+template<typename Container>
+void add(Container &c1, Container &c2) [[disjoint(c1, c2)]]
+{
+    auto i1{begin(c1)}; // i1 is derived from c1
+    auto i2{cbegin(c2)}; // i2 is derived from c2
+    for(auto count = c1.size(); count--; ) {
+        *i1++ += *i2++;
+            // because i1 is derived from c1, and c1 is disjoint with respect to c2,
+            // it can't change dereferenced objects derived from c2, including any
+            // value in the loop read with *i2, the compiler may vectorize, change the
+            // order of iteration, whatever.
+    }
+}
+```
+
+In that example, the disjoint named values are `c1` and `c2`.  Values returned from `std::launder` may alias.
 
 <sup><a name="copy-and-pasting-is-evil">1: copy and pasting is evil</a></sup> I need to compile all of my writings on redundant code is very detrimental
-
-

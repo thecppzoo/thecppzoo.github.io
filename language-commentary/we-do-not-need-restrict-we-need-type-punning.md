@@ -176,7 +176,7 @@ However, it is not just that very important reason.  In C++ we also have referen
 
 What is needed, then, is the way to express two sets have empty intersection.  Something like this would be a fundamental change to C++.
 
-Remember: the objective is to allow the programmer to discover or prove their objects satisfy guarantees and allow them to express those properties to activate better code paths, typically higher performing.  And we want to avoid copy and pasting<sup>[1: copy and pasting is evil](#copy-and-pasting-is-evil)</sup>.
+Remember: the objective is to allow the programmer to discover or prove their objects satisfy guarantees and allow them to express those properties to activate better code paths, typically higher performing.  And we want to avoid copy and pasting<sup>[1: copy and pasting is evil](#copy_and_pasting_is_evil)</sup>.
 
 With regards to expressing properties, invariants, etc., we have the class invariant mechanism, and we will soon have *Concepts*, and the mechanisms are excellent, and lead to great code reuse.  Now, all we need is a way to express in source code, at compilation time, that objects acquired properties (because the program was able to guarantee them at runtime) or lost properties (because things change at runtime), if we can encode, express, arbitrarily complex properties of objects through the type system, the usefulness of changing types for the same objects, i.e. type punning, is only natural, I would say *essential*
 

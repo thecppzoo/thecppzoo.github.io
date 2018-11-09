@@ -176,12 +176,12 @@ However, it is not just that very important reason.  In C++ we also have referen
 
 What is needed, then, is the way to express two sets have empty intersection.  Something like this would be a fundamental change to C++.
 
-Remember: the objective is to allow the programmer to discover or prove their objects satisfy guarantees and allow them to express those properties to activate better code paths, typically higher performing.  And we want to avoid copy and pasting<sup>[1: copy and pasting is evil](#copy_and_pasting_is_evil)</sup>.
+Remember: the objective is to allow the programmer to discover or prove their objects satisfy guarantees and allow them to express those properties to activate better code paths, typically higher performing.  And we want to avoid copy and pasting<sup>[1: copy and pasting is evil](#copy-and-pasting-is-evil)</sup>.
 
 With regards to expressing properties, invariants, etc., we have the class invariant mechanism, and we will soon have *Concepts*, and the mechanisms are excellent, and lead to great code reuse.  Now, all we need is a way to express in source code, at compilation time, that objects acquired properties (because the program was able to guarantee them at runtime) or lost properties (because things change at runtime), if we can encode, express, arbitrarily complex properties of objects through the type system, the usefulness of changing types for the same objects, i.e. type punning, is only natural, I would say *essential*
 
 A few minutes ago I was informed of the existence of [this paper](http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p1296r0.pdf), `restrict` as an attribute.  It is a better-than-nothing patch; the problem is that C++ already has too many patches of this level of value, and we take too long to get rid of bad ideas.  At least I liked it mentions the problem of generalization, although within the context of they don't intend to support initially the expression of disjoint ranges as the semiopen pair of addresses, but as base and element count, which I dislike because it is an antipattern in C++.  For the same syntax expense they could have expressed that two ranges described by any pair of iterators would be disjoint.  Instead they make the same idea unnecessarily less useful by constraining it to arrays specifically...
 
-<sup><a name="#copy-and-pasting-is-evil">1:</a></sup> I need to compile all of my writings on redundant code is very detrimental
+<sup><a id="#copy-and-pasting-is-evil">1:</a></sup> I need to compile all of my writings on redundant code is very detrimental
 
 

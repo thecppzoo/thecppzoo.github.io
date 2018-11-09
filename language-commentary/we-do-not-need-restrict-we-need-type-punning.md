@@ -110,9 +110,11 @@ For comparison's sake I put the function `addVectorsExpensive` that gets bloated
 
 ## Type punning, please!
 
-The above code is actually 100% legal C++.  The problem is that it is not useful.  `TypeAlias1` and `TypeAlias2` are an artifact of mine to tell GCC the ranges don't overlap, the alignment is fine and the counts are multiple of 16, the users should not be creating arrays of `TypeAlias1`.  But even if they can guarantee their arrays of floats are otherwise fully compatible, they are not `TypeAlias1` because they were not created like that.  The `reinterpret_cast` are a violation of the rules of the language, rules that I criticize.  This tool, of telling the compiler "from now on treat this memory as if it was of this type" is called **"Type Punning"**.  **It is forbidden**!.  (In case you are thinking about it, type punning through `union` is also forbidden *in C++, not C*).
+The above code is actually 100% legal C++.  The problem is that it is not useful.  `TypeAlias1` and `TypeAlias2` are an artifact of mine to tell GCC the ranges don't overlap, the alignment is fine and the counts are multiple of 16; these two types are like "words" used to convey an idea that can be expressed with other words.  I do not intend users to be creating arrays of `TypeAlias1`, they exist so that whenever the user has (at runtime) proven their array of `float`s satisfy the three properties, that from then on they can be treated as "aligned to 64, in blocks of 64 bytes, non overlapping".  But even if they can guarantee their arrays of floats are otherwise fully compatible, they are not `TypeAlias1` because they were not created like that.  Using the `reinterpret_cast` pointers are a violation of the rules of the language, the rules that I criticize in this article.
 
-There are only very few ways to change the type of some memory, one is to do "placement new", but the constructors may have side effects, so converting a type through placement new is not a general solution.  Another is to use `memcpy` or `memmove`, but they have their own restrictions, and in the case of arrays, this would not help.  Also, any of the valid ways to change the type of an object invalidates all previous references and pointers to the original compatible types, except when the conversion is to or from arrays of `char`; I solved the needs for type punning through placement new and this exception when implementing `AnyContainer`, but I figure they increased the work needed (and the tedium) by about 50% of what I would have to do if I had type punning.
+This tool, of telling the compiler "from now on treat this memory as if it was of this type" is called **"Type Punning"**.  **It is forbidden**!.  (In case you are thinking about it, type punning through `union` is also forbidden *in C++, not C*).
+
+There are only very few ways to change the type of some memory, one is to do "placement new", but the constructors may have side effects, so converting a type through placement new is not a general solution.  Another is to use `memcpy` or `memmove`, but they have their own restrictions, and in the case of arrays, this would not help.  Also, any of the valid ways to change the type of an object invalidates all previous references and pointers to the original compatible types, except when the conversion is to or from arrays of `char`; I solved the needs for type punning in `AnyContainer` through placement new and this exception, but I figure they increased the work needed (and the tedium) by about 50% of what I would have to do if I had type punning.
 
 It is not just that you could tell things to the compiler about your objects through type punning, as I did above, but that computing resources, CPUs, GPUs, FPGAs, etc., as a matter of course may treat the same bytes as different types.  So, the lack of type punning forces us the programmer to artificially convert the same bytes of one type to another to enable other operations.  But this is complicated, because you want the compiler to "understand" the conversion does nothing.
 
@@ -137,6 +139,8 @@ Again, the processors are capable of transferring 64 bytes at a time, but even i
 
 Strict aliasing means except some corner cases, objects of different types have to be in different locations of memory.
 
+Krister Walfridsson, a GCC developer, has referred to this subject matter in several occasions, including a discussion about [strict aliasing in C](https://kristerw.blogspot.com/2016/05/type-based-aliasing-in-c.html), that you should read if you need more context about strict aliasing before continuing this article.
+
 Linus Torvalds (the leader of Linux) has severely criticized the rule of strict aliasing in C (which applies to C++):
 
 > The standard simply is not \*important\*, when it is in direct conflict with reality and reliable code
@@ -149,7 +153,35 @@ I am undecided with regards to strict aliasing itself, although I think it is a 
 
 1. seems half useful: most operations work on values of the same type (thus they can alias), so, strict aliasing does not help 
 2. it seems the wrong solution: to make up rules in the language to cover for the lack of an actual way to express properties
-3. strict aliasing is extremely dangerous, because for legitimate performance reasons, people reuse the same memory with different types and then the compiler may not refresh a value that changed through a pointer of a different type leading to corruption.
-4. It is conceptually a half baked idea
+3. strict aliasing is extremely dangerous, because for legitimate reasons, people reuse the same memory with different types and then the compiler may not refresh a value that changed through a pointer of a different type leading to corruption.
+4. It is conceptually a half baked idea.  John Regehr, who has such prominence it can be said he can be authoritative commenting on these subjects, explains it really well in [his blog "The Strict Aliasing Situation is Pretty Bad"](https://blog.regehr.org/archives/1307), potentially a bad idea, period.
 
-I always recommend disable strict aliasing because of #3 above
+I always recommend disable strict aliasing because of #3 above, even though I know how to use strict aliasing for higher performance (just showed it, put the option of `-fno-strict-aliasing` in my code and you'll see).
+
+The reason why type punning is related to strict aliasing is that type punning may lead to strict aliasing violations.  If strict aliasing is a bad idea, then who cares about type punning potentially violating strict aliasing?
+
+Even if you like strict aliasing, it is possible for programmers to type pun without violations of strict aliasing, the code above shows an example of real-life code.
+
+**But for me these two rules are siblings of the same problem: solving the problem of lack of expressiveness the wrong way**, rather than draconian rules the programmers can't control and lead to unnecesssary, tedious, error prone work, we should have instead the capacity to **directly express things**.
+
+## `restrict`
+
+`restrict` means in C the pointers won't overlap.  Why can't we include it as-is in C++? because then we have to answer whether/how `restrict` discriminates the overloads.  In C there are no overloads.  The hardest part, by far, for everyone, of C++ are overloads.
+
+We have already a nightmare with `const`, `volatile`, `constexpr` and even `noexcept`.  There is a concept called the ["abominable function types"](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/p0172r0.html) where two of those four are involved in, and they get joined by `&` and `&&`.
+
+So, I will be blunt, we can't put `restrict` in C++ as it is in C.
+
+However, it is not just that very important reason.  In C++ we also have references that refer to memory and thus may or may not overlap.  And while we are at that, we ought to remember we also have smart pointers, ranges, array indices, hash map keys that refer to objects that may or may not overlap.  The `restrict` annotation is applied to an object (the pointer) that refers to another object, and is useful not just to the compiler, but it may be useful to the programmer too.  For example, knowing that two sets of map keys have empty intersection mean updating the mapped objects from one set of keys can be done in parallel to the update of the other mapped keys, the order won't matter.
+
+What is needed, then, is the way to express two sets have empty intersection.  Something like this would be a fundamental change to C++.
+
+Remember: the objective is to allow the programmer to discover or prove their objects satisfy guarantees and allow them to express those properties to activate better code paths, typically higher performing.  And we want to avoid copy and pasting<sup>[1: copy and pasting is evil](#copy_and_pasting_is_evil)</sup>.
+
+With regards to expressing properties, invariants, etc., we have the class invariant mechanism, and we will soon have *Concepts*, and the mechanisms are excellent, and lead to great code reuse.  Now, all we need is a way to express in source code, at compilation time, that objects acquired properties (because the program was able to guarantee them at runtime) or lost properties (because things change at runtime), if we can encode, express, arbitrarily complex properties of objects through the type system, the usefulness of changing types for the same objects, i.e. type punning, is only natural, I would say *essential*
+
+A few minutes ago I was informed of the existence of [this paper](http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p1296r0.pdf), `restrict` as an attribute.  It is a better-than-nothing patch; the problem is that C++ already have too many patches of this level of value, and we take too long to get rid of bad ideas.
+
+<a name="#copy-and-pasting-is-evil">1</a>I need to compile all of my writings on redundant code is very detrimental
+
+

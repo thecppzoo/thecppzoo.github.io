@@ -42,8 +42,9 @@ struct HasDestructor {
 };
 
 void fun() {
-    HasDestructor hd;
+    HasDestructor hd1;
     opaquePreamble();
+    HasDestructor hd2;
     opaqueEpilog();
 }
 ```
@@ -55,15 +56,29 @@ fun():                                # @fun()
         lea     rdi, [rsp + 8]
         call    HasDestructor::HasDestructor() [complete object constructor]
         call    opaquePreamble()
+        mov     rdi, rsp
+        call    HasDestructor::HasDestructor() [complete object constructor]
         call    opaqueEpilog()
+        mov     rdi, rsp
+        call    HasDestructor::~HasDestructor() [complete object destructor]
         lea     rdi, [rsp + 8]
         call    HasDestructor::~HasDestructor() [complete object destructor]
         add     rsp, 16
         pop     rbx
         ret
         mov     rbx, rax
+        mov     rdi, rsp
+        call    HasDestructor::~HasDestructor() [complete object destructor]
+        jmp     .LBB0_8
+        jmp     .LBB0_7
+.LBB0_7:
+        mov     rbx, rax
+.LBB0_8:
         lea     rdi, [rsp + 8]
         call    HasDestructor::~HasDestructor() [complete object destructor]
         mov     rdi, rbx
         call    _Unwind_Resume
 ```
+You can see the size of the code itself, 15 assembler lines, is in the same order as the exception table, 10 assembler lines and 2 labels.
+
+For our code to not care about calling destructors of local variables if an exception occurs the only way is to make it so the compiler can prove there are no exceptions, for that very consistent `noexcept` is needed.
